@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: vidorac-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: VIDORAC_ENV
+        value: production
+      - key: VIDORAC_MAX_CONCURRENT_JOBS
+        value: "1"
+      - key: VIDORAC_ALLOWED_ORIGINS
+        sync: false

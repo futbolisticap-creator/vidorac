@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 64" role="img" aria-labelledby="title desc">
+  <title id="title">Vidorac</title>
+  <desc id="desc">Vidorac media downloader logo</desc>
+  <g>
+    <path fill="#168BFF" d="M6 9h14.5L32 39.2 43.5 9H58L38.7 55H25.3L6 9Z"/>
+    <path fill="#6DE3FF" d="m27.5 20 15 10-15 10V20Z"/>
+  </g>
+  <text x="74" y="43" fill="#F4F8FC" font-family="Geist, Inter, Arial, sans-serif" font-size="34" font-weight="680" letter-spacing="-1.4">Vidorac</text>
+</svg>
