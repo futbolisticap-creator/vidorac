@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const SITE_URL = "https://vidorac.pages.dev";
-export const OG_IMAGE_PATH = "/branding/vidorac-og.svg";
+export const OG_IMAGE_PATH = "/branding/vidorac-og.png";
 
 export type PlatformSlug =
   | "youtube-downloader"
