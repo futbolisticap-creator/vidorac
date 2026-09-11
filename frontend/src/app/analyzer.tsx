@@ -116,6 +116,7 @@ function formatEstimatedSize(bytes: number | null): string | null {
 function publicAnalyzeError(detail?: string): string {
   if (detail === "Invalid URL.") return "Please paste a valid URL.";
   if (detail?.startsWith("TikTok temporarily") || detail?.startsWith("This TikTok")) return detail;
+  if (detail?.startsWith("YouTube ")) return detail;
   if (detail?.startsWith("Unsupported URL.")) return "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.";
   if (detail?.includes("individual posts")) return "Paste a link to one individual post, not a profile or feed.";
   if (detail?.includes("too many")) return "This post contains too many files.";
