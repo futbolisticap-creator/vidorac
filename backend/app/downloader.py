@@ -152,6 +152,8 @@ def _map_download_error(message: str, *, ffmpeg_available: bool) -> DownloadPrep
     lowered = message.lower()
     if any(term in lowered for term in ("timed out", "timeout", "connection reset", "network is unreachable")):
         return NetworkTimeoutError()
+    if any(term in lowered for term in ("not a bot", "anti-bot", "po token", "pot required", "po-token")):
+        return TemporaryUnavailableError()
     if any(term in lowered for term in ("403", "429", "too many requests", "ip address is blocked", "ip blocked")):
         return SourceBlockedError()
     if any(term in lowered for term in ("http error 404", "status code 404", "not found")):

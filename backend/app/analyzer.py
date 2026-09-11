@@ -66,27 +66,64 @@ class UnsupportedCollectionUrlError(UnsupportedUrlError):
 
 
 class AnalysisFailedError(RuntimeError):
-    def __init__(self, message: str = "analysis failed", *, technical_error: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str = "analysis failed",
+        *,
+        technical_error: str | None = None,
+        error_category: str = "generic_extraction_failure",
+    ) -> None:
         self.technical_error = technical_error
+        self.error_category = error_category
         super().__init__(message)
 
 
 class AnalysisAuthenticationError(AnalysisFailedError):
-    def __init__(self, platform: str, *, technical_error: str | None = None) -> None:
+    def __init__(
+        self,
+        platform: str,
+        *,
+        technical_error: str | None = None,
+        error_category: str = "authentication_required",
+    ) -> None:
         self.platform = platform
-        super().__init__(f"{platform} authentication required", technical_error=technical_error)
+        super().__init__(
+            f"{platform} authentication required",
+            technical_error=technical_error,
+            error_category=error_category,
+        )
 
 
 class AnalysisSourceBlockedError(AnalysisFailedError):
-    def __init__(self, platform: str, *, technical_error: str | None = None) -> None:
+    def __init__(
+        self,
+        platform: str,
+        *,
+        technical_error: str | None = None,
+        error_category: str = "source_blocked",
+    ) -> None:
         self.platform = platform
-        super().__init__(f"{platform} source blocked", technical_error=technical_error)
+        super().__init__(
+            f"{platform} source blocked",
+            technical_error=technical_error,
+            error_category=error_category,
+        )
 
 
 class AnalysisTemporaryError(AnalysisFailedError):
-    def __init__(self, platform: str, *, technical_error: str | None = None) -> None:
+    def __init__(
+        self,
+        platform: str,
+        *,
+        technical_error: str | None = None,
+        error_category: str = "temporary_platform_failure",
+    ) -> None:
         self.platform = platform
-        super().__init__(f"{platform} temporarily unavailable", technical_error=technical_error)
+        super().__init__(
+            f"{platform} temporarily unavailable",
+            technical_error=technical_error,
+            error_category=error_category,
+        )
 
 
 class AnalysisContentUnavailableError(AnalysisFailedError):
@@ -113,6 +150,55 @@ def _tiktok_technical_error(message: str) -> tuple[str, str]:
         if any(term in lowered for term in terms):
             return category, f"TikTok extractor · {category} · {safe_message}"
     return "extractor", "TikTok extractor · extractor · Unclassified yt-dlp extraction failure"
+
+
+def _youtube_technical_error(message: str) -> tuple[str, str]:
+    """Classify YouTube failures without treating anti-bot challenges as private media."""
+    lowered = message.lower()
+    cases = (
+        (
+            ("private video",),
+            "private_media",
+            "Private video",
+        ),
+        (
+            ("members-only", "members only", "join this channel to get access", "login-only media"),
+            "authentication_required",
+            "Members-only or login-only media",
+        ),
+        (
+            ("429", "too many requests"),
+            "rate_limit",
+            "HTTP 429 rate limit",
+        ),
+        (
+            ("po token", "pot required", "po-token"),
+            "youtube_verification_required",
+            "PO Token verification required",
+        ),
+        (
+            (
+                "sign in to confirm you're not a bot",
+                "sign in to confirm you’re not a bot",
+                "not a bot",
+                "anti-bot",
+                "http error 403",
+                "status code 403",
+                "challenge",
+                "n challenge",
+                "sig challenge",
+            ),
+            "temporary_platform_challenge",
+            "Sign in to confirm you're not a bot",
+        ),
+    )
+    for terms, category, safe_message in cases:
+        if any(term in lowered for term in terms):
+            return category, f"YouTube extractor · {category} · {safe_message}"
+    return (
+        "generic_extraction_failure",
+        "YouTube extractor · generic_extraction_failure · Unclassified yt-dlp extraction failure",
+    )
 
 
 def validate_and_classify_url(raw_url: str) -> tuple[str, str]:
@@ -384,6 +470,30 @@ def analyze_media(raw_url: str) -> dict[str, Any]:
     except yt_dlp.utils.DownloadError as exc:
         logger.warning("yt-dlp could not analyze %s: %s", url, exc)
         lowered = str(exc).lower()
+        if platform == "youtube":
+            category, technical_error = _youtube_technical_error(str(exc))
+            if category in {"private_media", "authentication_required"}:
+                raise AnalysisAuthenticationError(
+                    platform,
+                    technical_error=technical_error,
+                    error_category=category,
+                ) from exc
+            if category == "rate_limit":
+                raise AnalysisSourceBlockedError(
+                    platform,
+                    technical_error=technical_error,
+                    error_category=category,
+                ) from exc
+            if category in {"temporary_platform_challenge", "youtube_verification_required"}:
+                raise AnalysisTemporaryError(
+                    platform,
+                    technical_error=technical_error,
+                    error_category=category,
+                ) from exc
+            raise AnalysisFailedError(
+                technical_error=technical_error,
+                error_category=category,
+            ) from exc
         tiktok_technical_error: str | None = None
         if platform == "tiktok":
             _category, tiktok_technical_error = _tiktok_technical_error(str(exc))

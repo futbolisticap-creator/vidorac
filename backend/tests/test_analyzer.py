@@ -8,6 +8,7 @@ import yt_dlp
 from app.analyzer import (
     AnalysisAuthenticationError,
     AnalysisContentUnavailableError,
+    AnalysisFailedError,
     AnalysisSourceBlockedError,
     AnalysisTemporaryError,
     YDL_OPTIONS,
@@ -205,6 +206,69 @@ class UrlValidationTests(unittest.TestCase):
         ):
             analyze_content("https://www.tiktok.com/@creator/video/123")
         gallery.assert_not_called()
+
+    def test_youtube_failures_distinguish_challenges_from_private_media(self) -> None:
+        cases = (
+            (
+                "Sign in to confirm you're not a bot",
+                AnalysisTemporaryError,
+                "temporary_platform_challenge",
+            ),
+            ("Private video", AnalysisAuthenticationError, "private_media"),
+            (
+                "Join this channel to get access",
+                AnalysisAuthenticationError,
+                "authentication_required",
+            ),
+            ("HTTP Error 429: Too Many Requests", AnalysisSourceBlockedError, "rate_limit"),
+            (
+                "This client requires a PO Token",
+                AnalysisTemporaryError,
+                "youtube_verification_required",
+            ),
+            (
+                "HTTP Error 403: Forbidden during player challenge",
+                AnalysisTemporaryError,
+                "temporary_platform_challenge",
+            ),
+            (
+                "Unable to extract player response",
+                AnalysisFailedError,
+                "generic_extraction_failure",
+            ),
+        )
+        for message, expected_type, expected_category in cases:
+            downloader = MagicMock()
+            downloader.__enter__.return_value.extract_info.side_effect = yt_dlp.utils.DownloadError(message)
+            with (
+                self.subTest(message=message),
+                patch("app.analyzer.yt_dlp.YoutubeDL", return_value=downloader),
+                self.assertRaises(expected_type) as caught,
+            ):
+                analyze_media("https://www.youtube.com/watch?v=test")
+            self.assertEqual(caught.exception.error_category, expected_category)
+            self.assertIn("YouTube extractor", caught.exception.technical_error or "")
+
+    def test_youtube_challenge_response_is_sanitized_and_temporary(self) -> None:
+        from app.main import AnalyzeRequest, analyze
+
+        error = AnalysisTemporaryError(
+            "youtube",
+            technical_error="YouTube extractor · temporary_platform_challenge · Sign in to confirm you're not a bot",
+            error_category="temporary_platform_challenge",
+        )
+        with (
+            patch("app.main.DEVELOPMENT_MODE", True),
+            patch("app.main.analyze_content", side_effect=error),
+        ):
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.youtube.com/watch?v=test")))
+        payload = json.loads(response.body)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            payload["detail"],
+            "YouTube is temporarily unable to process this request from our server. Please try again later.",
+        )
+        self.assertEqual(payload["technical_error"], error.technical_error)
 
 
 class AnalyzeEndpointErrorTests(unittest.TestCase):

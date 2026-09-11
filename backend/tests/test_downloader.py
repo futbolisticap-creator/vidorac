@@ -164,6 +164,16 @@ class PresetTests(unittest.TestCase):
         self.assertIsInstance(_map_download_error("Unexpected response from webpage request", ffmpeg_available=True), TemporaryUnavailableError)
         self.assertIsInstance(_map_download_error("impersonation dependency missing", ffmpeg_available=True), TemporaryUnavailableError)
 
+    def test_youtube_challenge_is_not_mapped_to_authentication(self) -> None:
+        self.assertIsInstance(
+            _map_download_error("Sign in to confirm you're not a bot", ffmpeg_available=True),
+            TemporaryUnavailableError,
+        )
+        self.assertIsInstance(
+            _map_download_error("PO Token required", ffmpeg_available=True),
+            TemporaryUnavailableError,
+        )
+
     def test_retries_are_controlled(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             options, _state = build_ydl_options(

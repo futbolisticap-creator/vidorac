@@ -236,6 +236,8 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
         detail = (
             "TikTok temporarily blocked access from this network. Please try again later."
             if error.platform == "tiktok"
+            else "YouTube is temporarily limiting requests from our server. Please try again later."
+            if error.platform == "youtube"
             else "The source temporarily rejected the request. Please try again later."
         )
         return JSONResponse(status_code=429, content=analysis_error_content(detail, error))
@@ -243,6 +245,10 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
         detail = (
             "TikTok is temporarily unavailable due to changes on the platform. Please try again later."
             if error.platform == "tiktok"
+            else "YouTube currently requires additional verification for this media. Please try again later."
+            if error.platform == "youtube" and error.error_category == "youtube_verification_required"
+            else "YouTube is temporarily unable to process this request from our server. Please try again later."
+            if error.platform == "youtube"
             else "The source is temporarily unavailable. Please try again later."
         )
         return JSONResponse(status_code=503, content=analysis_error_content(detail, error))
