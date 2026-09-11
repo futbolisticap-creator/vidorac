@@ -520,7 +520,8 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 @media (max-width: 480px) {
-  .header-home-link { display: none; }
+  .header-home-link,
+  .header-how-link { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

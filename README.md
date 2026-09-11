@@ -161,6 +161,15 @@ Render Free Web Service (FastAPI Docker backend)
 
 The frontend is a Next.js static export. `npm run build` creates `frontend/out/`; it does not require a Node.js server, Cloudflare Functions, or Cloudflare Workers. The backend runs separately as a single-worker Docker service on Render so in-memory download IDs remain consistent.
 
+### Live public beta
+
+- Frontend: `https://vidorac.pages.dev`
+- Backend: `https://vidorac-api.onrender.com`
+- Health check: `https://vidorac-api.onrender.com/api/health`
+- Support: `https://ko-fi.com/vidorac`
+
+The frontend is hosted as a static Cloudflare Pages project and the backend is a Render Free web service. Render only allows the exact production origin `https://vidorac.pages.dev` through CORS.
+
 ### Environment variables
 
 Local frontend configuration belongs in `frontend/.env.local`, which is ignored by Git:

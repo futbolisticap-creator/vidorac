@@ -60,13 +60,13 @@ export default function Home() {
   return (
     <main className="page-shell min-h-screen text-white">
       <section className="hero-section relative mx-auto flex w-full max-w-[73.75rem] flex-col items-center px-4 pb-12 pt-32 text-center sm:px-6 sm:pt-36 lg:px-8">
-        <h1 className="max-w-4xl text-balance text-[clamp(2.55rem,6vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.06em]">
+        <h1 className="w-full min-w-0 max-w-4xl text-balance text-[clamp(2.55rem,6vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.06em]">
           Download videos, <span className="hero-accent">images &amp; carousels.</span>
         </h1>
-        <p className="mt-6 max-w-2xl text-pretty text-base leading-7 text-[var(--text-muted)] sm:text-lg">
+        <p className="mt-6 w-full min-w-0 max-w-2xl text-pretty text-base leading-7 text-[var(--text-muted)] sm:text-lg">
           Download public media from YouTube, TikTok, Instagram, X, Reddit and Facebook.
         </p>
-        <p className="mt-2.5 max-w-2xl text-pretty text-xs leading-5 text-[var(--text-faint)] sm:text-sm">
+        <p className="mt-2.5 w-full min-w-0 max-w-2xl text-pretty text-xs leading-5 text-[var(--text-faint)] sm:text-sm">
           Public beta — we&apos;re continuously improving reliability and platform support.
         </p>
 
