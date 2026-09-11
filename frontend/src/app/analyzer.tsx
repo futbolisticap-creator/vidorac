@@ -5,13 +5,16 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import { API_BASE_URL } from "./api-config";
+import PlatformAvailabilityNotice from "./platform-availability-notice";
+import {
+  detectPlatformFromUrl,
+  isPlatformEnabled,
+  platformHosts,
+  type PlatformId,
+} from "./platform-status";
 import { SupportCard } from "./support-button";
 
-const SUPPORTED_HOSTS = [
-  "youtube.com", "youtu.be", "tiktok.com", "instagram.com",
-  "x.com", "twitter.com", "reddit.com", "redd.it", "v.redd.it",
-  "facebook.com", "fb.watch",
-];
+const SUPPORTED_HOSTS = Object.values(platformHosts).flat();
 const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
 const ANALYZE_TIMEOUT_MS = IS_DEVELOPMENT ? 60_000 : 120_000;
 
@@ -170,6 +173,7 @@ export default function Analyzer() {
   const [failedPreviews, setFailedPreviews] = useState<Set<number>>(new Set());
   const [analysisWaitState, setAnalysisWaitState] = useState<AnalysisWaitState>("idle");
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
+  const [unavailablePlatform, setUnavailablePlatform] = useState<PlatformId | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const analysisTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -208,6 +212,7 @@ export default function Analyzer() {
     let didTimeout = false;
 
     setIsAnalyzing(true);
+    setUnavailablePlatform(null);
     setAnalysisWaitState("analyzing");
     setRetryUrl(requestedUrl);
     setError(null);
@@ -291,10 +296,30 @@ export default function Analyzer() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setUnavailablePlatform(null);
     const validation = validateUrl(url);
     if (validation === "invalid" || validation === "unsupported") {
       setMedia(null);
       setError(validation === "invalid" ? "Please paste a valid URL." : "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.");
+      return;
+    }
+    const platform = detectPlatformFromUrl(url);
+    if (!isPlatformEnabled(platform) && platform) {
+      analysisRequestId.current += 1;
+      analysisController.current?.abort();
+      clearAnalysisTimers();
+      setIsAnalyzing(false);
+      setAnalysisWaitState("idle");
+      setUnavailablePlatform(platform);
+      setError(null);
+      setTechnicalError(null);
+      setMedia(null);
+      setAnalyzedUrl(null);
+      setDownloadError(null);
+      setLastDownload(null);
+      setSelectedItems(new Set());
+      setDownloadPhases({});
+      setRetryUrl(null);
       return;
     }
     void runAnalysis(url.trim());
@@ -377,7 +402,7 @@ export default function Analyzer() {
     analysisRequestId.current += 1;
     analysisController.current?.abort();
     analysisController.current = null;
-    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setIsAnalyzing(false);
+    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setUnavailablePlatform(null); setIsAnalyzing(false);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }
 
@@ -410,6 +435,7 @@ export default function Analyzer() {
             {analysisWaitState === "timed-out" && <button type="button" onClick={retryAnalysis} className="analysis-retry-button">Try again</button>}
           </div>}
           {error && <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p>}
+          {unavailablePlatform && <PlatformAvailabilityNotice platform={unavailablePlatform} />}
           {IS_DEVELOPMENT && technicalError && error && <button type="button" onClick={copyTechnicalError} className="ml-2 mt-2 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65">{copiedError ? "Copied" : "Copy technical error"}</button>}
         </div>
       </form>

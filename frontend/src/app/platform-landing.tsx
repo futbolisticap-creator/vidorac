@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Analyzer from "./analyzer";
+import PlatformAvailabilityNotice from "./platform-availability-notice";
 import type { PlatformPageContent } from "./platform-content";
+import { platformBySlug, platformStatus } from "./platform-status";
 import { platformLinks } from "./seo";
 import SiteFooter from "./site-footer";
 import SupportButton from "./support-button";
@@ -12,12 +14,14 @@ const steps = [
 ];
 
 export default function PlatformLanding({ content }: { content: PlatformPageContent }) {
+  const platform = platformBySlug[content.slug];
   return (
     <main className="page-shell min-h-screen text-white">
       <section className="platform-hero mx-auto w-full max-w-[73.75rem] px-4 pb-12 pt-32 text-center sm:px-6 sm:pt-36 lg:px-8">
         <p className="section-label">{content.eyebrow}</p>
         <h1 className="mx-auto mt-4 w-full max-w-4xl text-balance text-[clamp(2.35rem,6vw,4rem)] font-semibold leading-[1.04] tracking-[-0.055em]">{content.h1}</h1>
         <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-7 text-[var(--text-muted)] sm:text-lg">{content.intro}</p>
+        <PlatformAvailabilityNotice platform={platform} context="landing" />
         <Analyzer />
       </section>
 
@@ -69,7 +73,7 @@ export default function PlatformLanding({ content }: { content: PlatformPageCont
 
       <nav className="seo-section related-platforms seo-section-bordered" aria-label="Other supported platforms">
         <h2>Explore other supported sites</h2>
-        <div>{platformLinks.filter((item) => item.slug !== content.slug).map((item) => <Link key={item.slug} href={`/${item.slug}`}>{item.name}<span>{item.media}</span></Link>)}</div>
+        <div>{platformLinks.filter((item) => item.slug !== content.slug).map((item) => <Link key={item.slug} href={`/${item.slug}`}>{item.name}<span>{item.media}</span>{!platformStatus[platformBySlug[item.slug]].enabled && <span className="platform-status-badge">Temporarily unavailable</span>}</Link>)}</div>
       </nav>
       <SiteFooter />
     </main>

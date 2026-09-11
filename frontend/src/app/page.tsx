@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import Analyzer from "./analyzer";
+import { platformBySlug, platformStatus, type PlatformId } from "./platform-status";
 import SiteFooter from "./site-footer";
 import { platformLinks, SITE_URL } from "./seo";
 
@@ -40,13 +41,13 @@ function StepIcon({ step }: { step: string }) {
   return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">{paths[step]}</svg>;
 }
 
-const platforms = [
-  { name: "YouTube", icon: YoutubeIcon, color: "platform-youtube" },
-  { name: "TikTok", icon: TikTokIcon, color: "platform-tiktok" },
-  { name: "Instagram", icon: InstagramIcon, color: "platform-instagram" },
-  { name: "X", icon: XIcon, color: "platform-x" },
-  { name: "Reddit", icon: RedditIcon, color: "platform-reddit" },
-  { name: "Facebook", icon: FacebookIcon, color: "platform-facebook" },
+const platforms: Array<{ id: PlatformId; name: string; icon: typeof YoutubeIcon; color: string }> = [
+  { id: "youtube", name: "YouTube", icon: YoutubeIcon, color: "platform-youtube" },
+  { id: "tiktok", name: "TikTok", icon: TikTokIcon, color: "platform-tiktok" },
+  { id: "instagram", name: "Instagram", icon: InstagramIcon, color: "platform-instagram" },
+  { id: "x", name: "X", icon: XIcon, color: "platform-x" },
+  { id: "reddit", name: "Reddit", icon: RedditIcon, color: "platform-reddit" },
+  { id: "facebook", name: "Facebook", icon: FacebookIcon, color: "platform-facebook" },
 ];
 
 const steps = [
@@ -88,10 +89,11 @@ export default function Home() {
         <Analyzer />
 
         <div className="platform-strip mt-5" aria-label="Supported platforms">
-          {platforms.map(({ name, icon: Icon, color }) => (
+          {platforms.map(({ id, name, icon: Icon, color }) => (
             <span key={name} className="platform-item">
               <Icon className={`size-[1.05rem] ${color}`} />
               {name}
+              {!platformStatus[id].enabled && <span className="platform-status-badge">Unavailable</span>}
             </span>
           ))}
         </div>
@@ -107,7 +109,10 @@ export default function Home() {
         <div className="supported-sites-grid mt-8">
           {platformLinks.map((item) => (
             <Link key={item.slug} href={`/${item.slug}`} className="supported-site-card">
-              <span className="supported-site-name">{item.name}</span>
+              <span className="supported-site-heading">
+                <span className="supported-site-name">{item.name}</span>
+                {!platformStatus[platformBySlug[item.slug]].enabled && <span className="platform-status-badge">Temporarily unavailable</span>}
+              </span>
               <span>{item.media}</span>
               <span className="supported-site-cta">Learn more →</span>
             </Link>

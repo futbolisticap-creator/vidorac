@@ -341,6 +341,23 @@ button { -webkit-tap-highlight-color: transparent; }
   white-space: nowrap;
 }
 
+.platform-status-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid rgba(159, 178, 201, 0.2);
+  border-radius: 999px;
+  background: rgba(159, 178, 201, 0.07);
+  color: #9eacbd;
+  font-size: 0.58rem;
+  font-weight: 650;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .platform-youtube { color: #ff5d69; }
 .platform-tiktok,
 .platform-x { color: #f4f8fc; }
@@ -419,6 +436,14 @@ button { -webkit-tap-highlight-color: transparent; }
   font-weight: 650;
 }
 
+.supported-site-heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .supported-site-cta {
   margin-top: 0.2rem;
   color: #71c9ff;
@@ -430,6 +455,48 @@ button { -webkit-tap-highlight-color: transparent; }
   min-height: 39rem;
   flex-direction: column;
   align-items: center;
+}
+
+.platform-availability-notice {
+  width: min(100%, 44rem);
+  margin-top: 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgba(126, 153, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(105, 130, 160, 0.07);
+  text-align: left;
+}
+
+.platform-availability-notice h2 {
+  margin-top: 0.3rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.platform-availability-notice p:not(.platform-availability-eyebrow) {
+  margin-top: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45rem;
+}
+
+.platform-availability-eyebrow {
+  color: #91a3b8;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.platform-availability-notice .platform-availability-secondary {
+  color: var(--text-faint);
+  font-size: 0.76rem;
+}
+
+.platform-availability-notice-landing {
+  margin-top: 1.5rem;
 }
 
 .seo-section {
