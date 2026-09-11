@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Vidorac Public Beta</title>
+  <desc id="desc">Download public videos, images and carousels with Vidorac.</desc>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="20%" r="70%"><stop offset="0" stop-color="#1677f2" stop-opacity=".28"/><stop offset="1" stop-color="#06101d" stop-opacity="0"/></radialGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#68d3ff"/><stop offset="1" stop-color="#1677f2"/></linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#06101d"/><rect width="1200" height="630" fill="url(#glow)"/>
+  <g transform="translate(120 155)"><path d="M0 0h82l42 142L166 0h82L147 300H101z" fill="url(#mark)"/><path d="m94 92 85 58-85 58z" fill="#06101d"/></g>
+  <text x="405" y="278" fill="#f4f8fc" font-family="Arial, Helvetica, sans-serif" font-size="94" font-weight="700">Vidorac</text>
+  <text x="410" y="342" fill="#68d3ff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" letter-spacing="5">PUBLIC BETA</text>
+  <text x="120" y="492" fill="#a7b5c7" font-family="Arial, Helvetica, sans-serif" font-size="38">Videos, images &amp; carousels. One clean download.</text>
+</svg>

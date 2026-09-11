@@ -379,6 +379,218 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .how-section { border-top: 1px solid var(--border-soft); }
 
+.supported-sites-section { border-top: 1px solid var(--border-soft); }
+
+.supported-sites-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.supported-site-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.022);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.supported-site-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(104, 211, 255, 0.3);
+  background: rgba(22, 119, 242, 0.06);
+}
+
+.supported-site-card:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.supported-site-name {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.supported-site-cta {
+  margin-top: 0.2rem;
+  color: #71c9ff;
+  font-weight: 600;
+}
+
+.platform-hero {
+  display: flex;
+  min-height: 39rem;
+  flex-direction: column;
+  align-items: center;
+}
+
+.seo-section {
+  width: min(calc(100% - 2rem), 73.75rem);
+  margin-inline: auto;
+  padding-block: 4.5rem;
+}
+
+.seo-section-bordered { border-top: 1px solid var(--border-soft); }
+
+.seo-section h2 {
+  margin-top: 0.75rem;
+  color: var(--text);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+}
+
+.seo-copy { max-width: 48rem; }
+
+.seo-copy > p:not(.section-label),
+.seo-donate-section p {
+  margin-top: 1rem;
+  color: var(--text-muted);
+  font-size: 0.96rem;
+  line-height: 1.8;
+}
+
+.seo-media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.seo-media-grid article,
+.limitations-card {
+  min-width: 0;
+  padding: 1.2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.seo-media-grid h3,
+.seo-steps h3 {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.seo-media-grid p,
+.seo-steps p,
+.limitations-card li {
+  margin-top: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.seo-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.25rem, 4vw, 3.5rem);
+  margin-top: 2rem;
+}
+
+.seo-steps article { min-width: 0; }
+
+.seo-steps article > span {
+  display: block;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--border-soft);
+  color: #62bfff;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.seo-steps h3 { margin-top: 1.1rem; }
+
+.seo-two-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.65fr);
+  gap: clamp(2rem, 7vw, 6rem);
+  align-items: start;
+}
+
+.limitations-card h2 { margin-top: 0; font-size: 1.1rem; letter-spacing: -0.02em; }
+.limitations-card ul { margin: 0.9rem 0 0; padding-left: 1.1rem; }
+.limitations-card li + li { margin-top: 0.7rem; }
+
+.seo-section-title { max-width: 42rem; }
+
+.faq-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 2rem;
+}
+
+.faq-list details {
+  min-width: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.faq-list summary {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.9rem;
+  font-weight: 620;
+}
+
+.faq-list summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+
+.faq-list p {
+  margin-top: 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+.seo-donate-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.seo-donate-section > div { max-width: 42rem; }
+
+.related-platforms h2 { margin-top: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
+
+.related-platforms > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+.related-platforms a {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  color: #b6c3d2;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.related-platforms a span { color: var(--text-faint); font-size: 0.72rem; font-weight: 400; }
+.related-platforms a:hover { border-color: rgba(104, 211, 255, 0.3); color: #8cd9ff; }
+.related-platforms a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
 .section-heading {
   display: flex;
   align-items: end;
@@ -467,6 +679,16 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .footer-links span[aria-disabled="true"] { cursor: default; }
+.footer-links a:not(.support-button) { color: inherit; text-decoration: none; }
+.footer-links a:not(.support-button):hover { color: var(--text); }
+
+.footer-legal {
+  max-width: 64rem;
+  margin-top: 1.1rem;
+  color: #536276;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
 
 .footer-bottom {
   display: flex;
@@ -497,6 +719,13 @@ button { -webkit-tap-highlight-color: transparent; }
   .footer-bottom { align-items: flex-start; flex-direction: column; }
   .footer-links { justify-content: flex-start; }
   .support-card { align-items: flex-start; flex-direction: column; }
+  .supported-sites-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .seo-media-grid,
+  .seo-steps,
+  .seo-two-column,
+  .faq-list { grid-template-columns: 1fr; }
+  .seo-section { padding-block: 3.5rem; }
+  .seo-donate-section { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 639px) {
@@ -508,6 +737,8 @@ button { -webkit-tap-highlight-color: transparent; }
   .platform-strip { width: 100%; }
   .ad-placeholder { min-height: 100px; }
   .ad-dimensions { display: none; }
+  .platform-hero { min-height: auto; padding-top: 7.5rem; }
+  .supported-sites-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 390px) {

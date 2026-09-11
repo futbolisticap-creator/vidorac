@@ -1,8 +1,9 @@
-import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import Analyzer from "./analyzer";
-import SupportButton from "./support-button";
+import SiteFooter from "./site-footer";
+import { platformLinks, SITE_URL } from "./seo";
 
 type IconProps = { className?: string };
 
@@ -54,11 +55,25 @@ const steps = [
   { number: "03", title: "Download", text: "Save it directly to your device." },
 ];
 
-const footerLinks = ["Privacy", "Terms", "Contact", "Supported sites"];
-
 export default function Home() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "WebSite", name: "Vidorac", url: `${SITE_URL}/` },
+      {
+        "@type": "WebApplication",
+        name: "Vidorac",
+        url: `${SITE_URL}/`,
+        applicationCategory: "MultimediaApplication",
+        operatingSystem: "Any modern web browser",
+        description: "Analyze and download accessible public videos, images and carousels from supported platforms.",
+        offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      },
+    ],
+  };
   return (
     <main className="page-shell min-h-screen text-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }} />
       <section className="hero-section relative mx-auto flex w-full max-w-[73.75rem] flex-col items-center px-4 pb-12 pt-32 text-center sm:px-6 sm:pt-36 lg:px-8">
         <h1 className="w-full min-w-0 max-w-4xl text-balance text-[clamp(2.55rem,6vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.06em]">
           Download videos, <span className="hero-accent">images &amp; carousels.</span>
@@ -84,6 +99,22 @@ export default function Home() {
         <AdPlaceholder format="banner" className="mt-12" />
       </section>
 
+      <section id="supported-sites" aria-labelledby="supported-sites-title" className="supported-sites-section mx-auto w-full max-w-[73.75rem] scroll-mt-24 px-4 pb-16 pt-12 sm:px-6 lg:px-8">
+        <div className="section-heading">
+          <div><p className="section-label">Supported sites</p><h2 id="supported-sites-title" className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">Guides for every supported platform.</h2></div>
+          <p className="trust-line">Public media only.</p>
+        </div>
+        <div className="supported-sites-grid mt-8">
+          {platformLinks.map((item) => (
+            <Link key={item.slug} href={`/${item.slug}`} className="supported-site-card">
+              <span className="supported-site-name">{item.name}</span>
+              <span>{item.media}</span>
+              <span className="supported-site-cta">Learn more →</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section id="how-it-works" aria-labelledby="how-it-works-title" className="how-section mx-auto w-full max-w-[73.75rem] scroll-mt-24 px-4 pb-24 pt-12 sm:px-6 lg:px-8">
         <div className="section-heading">
           <div>
@@ -107,27 +138,20 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="site-footer">
-        <div className="mx-auto w-full max-w-[73.75rem] px-4 py-10 sm:px-6 lg:px-8">
-          <div className="footer-main">
-            <div className="max-w-sm">
-              <div className="footer-brand">
-                <Image src="/branding/vidorac-logo.svg" alt="Vidorac" width={124} height={32} className="footer-brand-logo" />
-                <span className="footer-beta">Public Beta</span>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">A simple way to save public videos, images and carousels.</p>
-            </div>
-            <nav aria-label="Footer navigation" className="footer-links">
-              {footerLinks.map((label) => <span key={label} aria-disabled="true">{label}</span>)}
-              <SupportButton label="Support Vidorac" variant="footer" />
-            </nav>
-          </div>
-          <div className="footer-bottom">
-            <p>© {new Date().getFullYear()} Vidorac</p>
-            <p>Only download content you own or have permission to use.</p>
-          </div>
+      <section aria-labelledby="home-faq-title" className="seo-section seo-section-bordered">
+        <p className="section-label">Frequently asked questions</p>
+        <h2 id="home-faq-title" className="seo-section-title">What to know about Vidorac</h2>
+        <div className="faq-list">
+          <details><summary>Is Vidorac free?</summary><p>Yes. Vidorac is currently a free public beta. Donations are optional and help keep the project online.</p></details>
+          <details><summary>Which platforms does Vidorac support?</summary><p>Vidorac currently analyzes compatible public media from YouTube, TikTok, Instagram, X, Reddit and Facebook.</p></details>
+          <details><summary>Can I download private posts?</summary><p>No. Private, restricted and login-only media is not supported, and Vidorac does not request personal cookies or account credentials.</p></details>
+          <details><summary>Why is a quality unavailable?</summary><p>Available resolutions, containers and codecs depend on what the original public source exposes. Vidorac does not invent missing formats.</p></details>
+          <details><summary>Why can the first analysis take longer?</summary><p>The Render Free backend may sleep after inactivity and need up to about a minute to start. The page keeps you informed while it wakes.</p></details>
+          <details><summary>Does Vidorac store downloaded files?</summary><p>Prepared files use temporary storage and are cleaned automatically according to the existing one-time download lifecycle.</p></details>
         </div>
-      </footer>
+      </section>
+
+      <SiteFooter />
     </main>
   );
 }

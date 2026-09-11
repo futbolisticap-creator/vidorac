@@ -17,7 +17,7 @@ function getSupportUrl(): string | null {
 }
 
 export default function SupportButton({
-  label = "Support",
+  label = "Donate",
   variant = "header",
 }: SupportButtonProps) {
   const supportUrl = getSupportUrl();
@@ -28,8 +28,8 @@ export default function SupportButton({
       href={supportUrl}
       target="_blank"
       rel="noopener noreferrer"
-      data-event="support_click"
-      aria-label="Support Vidorac on Ko-fi (opens in a new tab)"
+      data-event="donate_click"
+      aria-label="Donate to Vidorac on Ko-fi (opens in a new tab)"
       className={`support-button support-button-${variant}`}
     >
       <span aria-hidden="true" className="support-heart">♥</span>
@@ -46,11 +46,11 @@ export function SupportCard() {
       <div>
         <h3 id="support-card-title">Enjoying Vidorac?</h3>
         <p>
-          Vidorac is free to use. If it helped you, consider supporting the
-          project and helping us keep it online.
+          Vidorac is free to use. If it helped you, consider donating to help
+          keep the project free and online.
         </p>
       </div>
-      <SupportButton label="Support Vidorac" variant="card" />
+      <SupportButton label="Donate to Vidorac" variant="card" />
     </aside>
   );
 }

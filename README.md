@@ -166,7 +166,7 @@ The frontend is a Next.js static export. `npm run build` creates `frontend/out/`
 - Frontend: `https://vidorac.pages.dev`
 - Backend: `https://vidorac-api.onrender.com`
 - Health check: `https://vidorac-api.onrender.com/api/health`
-- Support: `https://ko-fi.com/vidorac`
+- Donate: `https://ko-fi.com/vidorac`
 
 The frontend is hosted as a static Cloudflare Pages project and the backend is a Render Free web service. Render only allows the exact production origin `https://vidorac.pages.dev` through CORS.
 
@@ -177,6 +177,7 @@ Local frontend configuration belongs in `frontend/.env.local`, which is ignored 
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 NEXT_PUBLIC_SUPPORT_URL=https://ko-fi.com/vidorac
+NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=
 ```
 
 Cloudflare Pages must define both public variables using the real Render URL:
@@ -184,9 +185,10 @@ Cloudflare Pages must define both public variables using the real Render URL:
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=https://<real-render-service>.onrender.com
 NEXT_PUBLIC_SUPPORT_URL=https://ko-fi.com/vidorac
+NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION=
 ```
 
-The frontend deliberately fails fast when `NEXT_PUBLIC_API_BASE_URL` is missing or malformed, preventing a public build that silently calls localhost. The checked-in example documents the key, while each local or hosted environment supplies its own value.
+The frontend deliberately fails fast when `NEXT_PUBLIC_API_BASE_URL` is missing or malformed, preventing a public build that silently calls localhost. The checked-in example documents the key, while each local or hosted environment supplies its own value. `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` is optional: leave it empty until Google Search Console provides the HTML meta-tag token, then add only the token value to Cloudflare Pages and redeploy.
 
 Render uses:
 
