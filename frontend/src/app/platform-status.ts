@@ -1,14 +1,19 @@
 export type PlatformId = "youtube" | "tiktok" | "instagram" | "x" | "reddit" | "facebook";
+export type PlatformCapability = "reels" | "posts";
 
 type PlatformStatus = {
   enabled: boolean;
   status: "available" | "partially_available" | "temporarily_unavailable";
   statusLabel?: string;
-  capabilities?: {
-    reels: boolean;
-    posts: boolean;
-  };
+  capabilities?: Partial<Record<PlatformCapability, boolean>>;
 };
+
+export type AnalyzerUrlDecision =
+  | { action: "analyze"; platform: PlatformId }
+  | { action: "invalid" }
+  | { action: "unsupported" }
+  | { action: "platform_unavailable"; platform: PlatformId }
+  | { action: "instagram_posts_unavailable"; platform: "instagram" };
 
 export const platformStatus: Record<PlatformId, PlatformStatus> = {
   youtube: {
@@ -64,32 +69,56 @@ function matchesHostname(hostname: string, allowedHost: string): boolean {
   return hostname === allowedHost || hostname.endsWith(`.${allowedHost}`);
 }
 
-export function detectPlatformFromUrl(value: string): PlatformId | null {
+function parsePublicHttpUrl(value: string): URL | null {
   try {
     const parsed = new URL(value.trim());
-    const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
     if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password) return null;
-    for (const [platform, hosts] of Object.entries(platformHosts) as [PlatformId, readonly string[]][]) {
-      if (hosts.some((host) => matchesHostname(hostname, host))) return platform;
-    }
+    return parsed;
   } catch {
     return null;
+  }
+}
+
+function detectPlatform(parsed: URL): PlatformId | null {
+  const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+  for (const [platform, hosts] of Object.entries(platformHosts) as [PlatformId, readonly string[]][]) {
+    if (hosts.some((host) => matchesHostname(hostname, host))) return platform;
   }
   return null;
 }
 
+export function detectPlatformFromUrl(value: string): PlatformId | null {
+  const parsed = parsePublicHttpUrl(value);
+  return parsed ? detectPlatform(parsed) : null;
+}
+
 export function isPlatformEnabled(platform: PlatformId | null): boolean {
-  return platform === null || platformStatus[platform].enabled;
+  if (platform === null) return true;
+  return platformStatus[platform]?.enabled === true;
+}
+
+export function isCapabilityEnabled(platform: PlatformId, capability: PlatformCapability): boolean {
+  return platformStatus[platform]?.capabilities?.[capability] === true;
+}
+
+export function getAnalyzerUrlDecision(value: string): AnalyzerUrlDecision {
+  if (!value.trim()) return { action: "invalid" };
+  const parsed = parsePublicHttpUrl(value);
+  if (!parsed || (parsed.port && !["80", "443"].includes(parsed.port))) return { action: "invalid" };
+
+  const platform = detectPlatform(parsed);
+  if (!platform) return { action: "unsupported" };
+  if (
+    platform === "instagram"
+    && !isCapabilityEnabled("instagram", "posts")
+    && /^\/p\/[^/]+\/?$/.test(parsed.pathname)
+  ) {
+    return { action: "instagram_posts_unavailable", platform };
+  }
+  if (!isPlatformEnabled(platform)) return { action: "platform_unavailable", platform };
+  return { action: "analyze", platform };
 }
 
 export function isInstagramPostCapabilityDisabled(value: string): boolean {
-  if (platformStatus.instagram.capabilities?.posts !== false) return false;
-  try {
-    const parsed = new URL(value.trim());
-    const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
-    const isInstagram = platformHosts.instagram.some((host) => matchesHostname(hostname, host));
-    return isInstagram && /^\/p\/[^/]+\/?$/.test(parsed.pathname);
-  } catch {
-    return false;
-  }
+  return getAnalyzerUrlDecision(value).action === "instagram_posts_unavailable";
 }

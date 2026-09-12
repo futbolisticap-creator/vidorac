@@ -5,17 +5,15 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import { API_BASE_URL } from "./api-config";
+import { CLIPBOARD_UNAVAILABLE_MESSAGE, readClipboardTextSafely } from "./analyzer-client";
 import PlatformAvailabilityNotice from "./platform-availability-notice";
 import {
   detectPlatformFromUrl,
-  isInstagramPostCapabilityDisabled,
-  isPlatformEnabled,
-  platformHosts,
+  getAnalyzerUrlDecision,
   type PlatformId,
 } from "./platform-status";
 import { SupportCard } from "./support-button";
 
-const SUPPORTED_HOSTS = Object.values(platformHosts).flat();
 const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
 const ANALYZE_TIMEOUT_MS = IS_DEVELOPMENT ? 60_000 : 120_000;
 
@@ -75,19 +73,6 @@ type PrepareDownloadSuccess = { success: true; download_id: string; filename: st
 type DownloadPhase = "preparing" | "ready" | "started";
 type DownloadBody = { url: string; quality?: QualityOption["id"]; item_indices?: number[]; archive?: boolean };
 type LastDownload = { key: string; body: DownloadBody };
-
-function validateUrl(value: string): "valid" | "invalid" | "unsupported" {
-  if (!value.trim()) return "invalid";
-  try {
-    const parsed = new URL(value.trim());
-    const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
-    const supported = SUPPORTED_HOSTS.some((host) => hostname === host || hostname.endsWith(`.${host}`));
-    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password || (parsed.port && !["80", "443"].includes(parsed.port))) return "invalid";
-    return supported ? "valid" : "unsupported";
-  } catch {
-    return "invalid";
-  }
-}
 
 function formatDuration(duration: number | null): string | null {
   if (duration === null || !Number.isFinite(duration) || duration < 0) return null;
@@ -297,13 +282,13 @@ export default function Analyzer() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setUnavailablePlatform(null);
-    const validation = validateUrl(url);
-    if (validation === "invalid" || validation === "unsupported") {
+    const decision = getAnalyzerUrlDecision(url);
+    if (decision.action === "invalid" || decision.action === "unsupported") {
       setMedia(null);
-      setError(validation === "invalid" ? "Please paste a valid URL." : "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.");
+      setError(decision.action === "invalid" ? "Please paste a valid URL." : "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.");
       return;
     }
-    if (isInstagramPostCapabilityDisabled(url)) {
+    if (decision.action === "instagram_posts_unavailable") {
       analysisRequestId.current += 1;
       analysisController.current?.abort();
       clearAnalysisTimers();
@@ -321,14 +306,13 @@ export default function Analyzer() {
       setRetryUrl(null);
       return;
     }
-    const platform = detectPlatformFromUrl(url);
-    if (!isPlatformEnabled(platform) && platform) {
+    if (decision.action === "platform_unavailable") {
       analysisRequestId.current += 1;
       analysisController.current?.abort();
       clearAnalysisTimers();
       setIsAnalyzing(false);
       setAnalysisWaitState("idle");
-      setUnavailablePlatform(platform);
+      setUnavailablePlatform(decision.platform);
       setError(null);
       setTechnicalError(null);
       setMedia(null);
@@ -408,10 +392,13 @@ export default function Analyzer() {
     } catch { setCopiedError(false); }
   }
   async function handlePaste() {
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-      if (clipboardText.trim()) { setUrl(clipboardText.trim()); setError(null); }
-    } catch { setError("Clipboard access wasn't available. Paste the URL manually."); inputRef.current?.focus(); }
+    const result = await readClipboardTextSafely(typeof navigator === "undefined" ? undefined : navigator.clipboard);
+    if (!result.ok) {
+      setError(CLIPBOARD_UNAVAILABLE_MESSAGE);
+      inputRef.current?.focus();
+      return;
+    }
+    if (result.text.trim()) { setUrl(result.text.trim()); setError(null); }
   }
   function clearAnalyzer() {
     timers.current.forEach(clearTimeout);
@@ -421,7 +408,9 @@ export default function Analyzer() {
     analysisController.current?.abort();
     analysisController.current = null;
     setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setUnavailablePlatform(null); setIsAnalyzing(false);
-    window.requestAnimationFrame(() => inputRef.current?.focus());
+    const focusInput = () => inputRef.current?.focus();
+    if (typeof window === "undefined") focusInput();
+    else window.requestAnimationFrame(focusInput);
   }
 
   const isVideo = media?.media_type === "video";

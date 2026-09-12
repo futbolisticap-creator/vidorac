@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import Analyzer from "./analyzer";
+import AnalyzerBoundary from "./analyzer-boundary";
 import { platformBySlug, platformStatus, type PlatformId } from "./platform-status";
 import SiteFooter from "./site-footer";
 import { platformLinks, SITE_URL } from "./seo";
@@ -86,7 +87,7 @@ export default function Home() {
           Public beta — we&apos;re continuously improving reliability and platform support.
         </p>
 
-        <Analyzer />
+        <AnalyzerBoundary><Analyzer /></AnalyzerBoundary>
 
         <div className="platform-strip mt-5" aria-label="Supported platforms">
           {platforms.map(({ id, name, icon: Icon, color }) => (
