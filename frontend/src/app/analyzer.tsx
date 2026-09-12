@@ -434,6 +434,9 @@ export default function Analyzer() {
             {analysisWaitState === "timed-out" && <button type="button" onClick={retryAnalysis} className="analysis-retry-button">Try again</button>}
           </div>}
           {error && <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p>}
+          {error?.startsWith("Instagram is taking too long") && retryUrl && (
+            <button type="button" onClick={retryAnalysis} className="analysis-retry-button mt-3">Try again</button>
+          )}
           {unavailablePlatform && <PlatformAvailabilityNotice platform={unavailablePlatform} />}
           {IS_DEVELOPMENT && technicalError && error && <button type="button" onClick={copyTechnicalError} className="ml-2 mt-2 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65">{copiedError ? "Copied" : "Copy technical error"}</button>}
         </div>
