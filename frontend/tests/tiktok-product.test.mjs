@@ -20,6 +20,17 @@ test("analyzer presents separate video and MP3 actions", async () => {
   assert.doesNotMatch(source, /AdPlaceholder/);
 });
 
+test("primary navigation omits MP3 while keeping the SEO page", async () => {
+  const header = await read("src/app/site-header.tsx");
+  const mp3Page = await read("src/app/tiktok-mp3-downloader/page.tsx");
+
+  assert.doesNotMatch(header, /href="\/tiktok-mp3-downloader"/);
+  assert.match(header, /href="\/tiktok-downloader"/);
+  assert.match(header, /href="\/contact"/);
+  assert.match(header, /<SupportButton \/>/);
+  assert.match(mp3Page, /TikTok MP3 Downloader/);
+});
+
 test("legacy platform routes redirect and are absent from sitemap", async () => {
   const redirects = await read("public/_redirects");
   const sitemap = await read("src/app/sitemap.ts");
