@@ -15,9 +15,9 @@ export default function SiteFooter() {
             <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">A simple way to save public videos, images and carousels.</p>
           </div>
           <nav aria-label="Footer navigation" className="footer-links">
-            <span aria-disabled="true">Privacy</span>
-            <span aria-disabled="true">Terms</span>
-            <span aria-disabled="true">Contact</span>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+            <Link href="/contact">Contact</Link>
             <Link href="/#supported-sites">Supported sites</Link>
             <SupportButton label="Donate" variant="footer" />
           </nav>

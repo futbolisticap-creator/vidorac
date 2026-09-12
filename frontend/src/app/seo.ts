@@ -11,6 +11,8 @@ export type PlatformSlug =
   | "reddit-downloader"
   | "facebook-downloader";
 
+export type InformationSlug = "contact" | "privacy" | "terms";
+
 export const platformLinks: Array<{
   slug: PlatformSlug;
   name: string;
@@ -51,6 +53,31 @@ export function platformMetadata({
       title,
       description,
       images: [OG_IMAGE_PATH],
+    },
+  };
+}
+
+export function informationMetadata({
+  title,
+  description,
+  slug,
+}: {
+  title: string;
+  description: string;
+  slug: InformationSlug;
+}): Metadata {
+  const url = `${SITE_URL}/${slug}`;
+  return {
+    title: { absolute: title },
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: "Vidorac",
+      type: "website",
+      images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: "Vidorac public beta" }],
     },
   };
 }
