@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import Analyzer from "./analyzer";
 import AnalyzerBoundary from "./analyzer-boundary";
+import { AnalyzerDiagnosticsProvider } from "./analyzer-diagnostics";
 import { platformBySlug, platformStatus, type PlatformId } from "./platform-status";
 import SiteFooter from "./site-footer";
 import { platformLinks, SITE_URL } from "./seo";
@@ -87,7 +88,9 @@ export default function Home() {
           Public beta — we&apos;re continuously improving reliability and platform support.
         </p>
 
-        <AnalyzerBoundary><Analyzer /></AnalyzerBoundary>
+        <AnalyzerDiagnosticsProvider>
+          <AnalyzerBoundary><Analyzer /></AnalyzerBoundary>
+        </AnalyzerDiagnosticsProvider>
 
         <div className="platform-strip mt-5" aria-label="Supported platforms">
           {platforms.map(({ id, name, icon: Icon, color }) => (

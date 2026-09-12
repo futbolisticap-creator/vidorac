@@ -5,9 +5,18 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import AdPlaceholder from "./ad-placeholder";
 import { API_BASE_URL } from "./api-config";
-import { CLIPBOARD_UNAVAILABLE_MESSAGE, readClipboardTextSafely } from "./analyzer-client";
+import {
+  CLIPBOARD_UNAVAILABLE_MESSAGE,
+  normalizeAnalyzePayload,
+  normalizePreparePayload,
+  readClipboardTextSafely,
+  type MediaMetadata,
+  type QualityOption,
+} from "./analyzer-client";
+import { useAnalyzerDiagnostics } from "./analyzer-diagnostics";
 import PlatformAvailabilityNotice from "./platform-availability-notice";
 import {
+  describeUrlForDiagnostics,
   detectPlatformFromUrl,
   getAnalyzerUrlDecision,
   type PlatformId,
@@ -24,52 +33,6 @@ type AnalysisWaitState =
   | "taking-longer"
   | "timed-out";
 
-type QualityOption = {
-  id: "best" | "compatible" | "1080" | "720" | "480" | "mp3";
-  label: string;
-  available: boolean;
-  resolution: string | null;
-  container: string | null;
-  video_codec: string | null;
-  estimated_size_bytes: number | null;
-};
-
-type VideoMetadata = {
-  media_type: "video";
-  title: string | null;
-  thumbnail: string | null;
-  duration: number | null;
-  uploader: string | null;
-  platform: "youtube" | "tiktok" | "instagram" | "x" | "reddit" | "facebook";
-  webpage_url: string | null;
-  max_height: number | null;
-  quality_options: QualityOption[];
-};
-
-type GalleryItem = {
-  index: number;
-  type: "image" | "video";
-  thumbnail: string | null;
-  width: number | null;
-  height: number | null;
-  duration: number | null;
-  extension: string;
-};
-
-type GalleryMetadata = {
-  media_type: "image" | "gallery" | "mixed";
-  title: string | null;
-  thumbnail: string | null;
-  uploader: string | null;
-  platform: "tiktok" | "instagram" | "x" | "reddit" | "facebook";
-  item_count: number;
-  items: GalleryItem[];
-};
-
-type MediaMetadata = VideoMetadata | GalleryMetadata;
-type AnalyzeSuccess = { success: true; video?: VideoMetadata; media?: GalleryMetadata };
-type ApiError = { success: false; detail: string; technical_error?: string };
-type PrepareDownloadSuccess = { success: true; download_id: string; filename: string; content_type: string };
 type DownloadPhase = "preparing" | "ready" | "started";
 type DownloadBody = { url: string; quality?: QualityOption["id"]; item_indices?: number[]; archive?: boolean };
 type LastDownload = { key: string; body: DownloadBody };
@@ -147,6 +110,7 @@ function MediaFallback({ video = false }: { video?: boolean }) {
 }
 
 export default function Analyzer() {
+  const diagnostics = useAnalyzerDiagnostics();
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -212,6 +176,8 @@ export default function Analyzer() {
     setSelectedItems(new Set());
     setFailedPreviews(new Set());
     setDownloadPhases({});
+    diagnostics.setStage("request-start");
+    diagnostics.markRequestStarted();
 
     analysisTimers.current = [
       setTimeout(() => {
@@ -225,50 +191,63 @@ export default function Analyzer() {
         didTimeout = true;
         setAnalysisWaitState("timed-out");
         setIsAnalyzing(false);
-        controller.abort("timeout");
+        diagnostics.setResponseStatus("timeout");
+        diagnostics.captureError(new DOMException("Analysis timed out", "AbortError"), "analyze-timeout");
+        controller.abort();
       }, ANALYZE_TIMEOUT_MS),
     ];
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+      const request = fetch(`${API_BASE_URL}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: requestedUrl }),
         signal: controller.signal,
       });
+      diagnostics.setStage("request-waiting");
+      const response = await request;
       if (analysisRequestId.current !== requestId) return;
+      diagnostics.setResponseStatus(response.status);
       clearAnalysisTimers();
       setAnalysisWaitState("idle");
 
-      let data: AnalyzeSuccess | ApiError;
+      diagnostics.setStage("response-parsing");
+      let rawData: unknown;
       try {
-        data = (await response.json()) as AnalyzeSuccess | ApiError;
-      } catch {
+        const responseText = await response.text();
+        if (!responseText.trim()) throw new SyntaxError("Empty response body");
+        rawData = JSON.parse(responseText) as unknown;
+      } catch (parseError) {
         setError("Vidorac received an invalid response from the service.");
         setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Invalid JSON response"));
+        diagnostics.captureError(parseError, "analyze-response-parsing");
         return;
       }
-      if (!response.ok || !data.success) {
-        const detail = "detail" in data ? data.detail : undefined;
+      const data = normalizeAnalyzePayload(rawData);
+      if (!response.ok || data.kind === "error") {
+        const detail = data.kind === "error" ? data.detail : undefined;
         setError(publicAnalyzeError(detail));
-        const backendTechnicalError = "technical_error" in data ? data.technical_error : undefined;
+        const backendTechnicalError = data.kind === "error" ? data.technicalError : undefined;
         setTechnicalError(backendTechnicalError ?? technicalMessage("POST /api/analyze", response.status, detail));
+        diagnostics.captureError(new Error(detail ?? `HTTP ${response.status}`), "analyze-api-response");
         return;
       }
-      const analyzed = data.video ?? data.media;
-      if (!analyzed) {
+      if (data.kind !== "success") {
         setError("Vidorac received an invalid response from the service.");
-        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Missing media payload"));
+        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Unexpected response schema"));
+        diagnostics.captureError(new TypeError("Unexpected analyze response schema"), "analyze-schema-validation");
         return;
       }
-      setMedia(analyzed);
+      diagnostics.setStage("rendering-result");
+      setMedia(data.media);
       setAnalyzedUrl(requestedUrl);
-    } catch {
+    } catch (requestError) {
       if (analysisRequestId.current !== requestId || didTimeout) return;
       clearAnalysisTimers();
       setAnalysisWaitState("idle");
       setError("We couldn't reach Vidorac's service. Please try again.");
       setTechnicalError(technicalMessage("POST /api/analyze", "NETWORK"));
+      diagnostics.captureError(requestError, "analyze-fetch");
     } finally {
       if (analysisRequestId.current === requestId) {
         clearAnalysisTimers();
@@ -281,8 +260,14 @@ export default function Analyzer() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    diagnostics.resetAttempt();
+    diagnostics.setStage("url-parsing");
     setUnavailablePlatform(null);
     const decision = getAnalyzerUrlDecision(url);
+    diagnostics.setStage("platform-detection");
+    const urlContext = describeUrlForDiagnostics(url);
+    diagnostics.setUrlContext(urlContext.platform, urlContext.type);
+    diagnostics.setStage("capability-check");
     if (decision.action === "invalid" || decision.action === "unsupported") {
       setMedia(null);
       setError(decision.action === "invalid" ? "Please paste a valid URL." : "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.");
@@ -339,20 +324,42 @@ export default function Analyzer() {
     setDownloadError(null);
     setTechnicalError(null);
     setCopiedError(false);
+    diagnostics.setStage("download-preparation");
     try {
       const response = await fetch(`${API_BASE_URL}/api/download/prepare`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const data = (await response.json()) as PrepareDownloadSuccess | ApiError;
-      if (!response.ok || !data.success) {
-        const detail = "detail" in data ? data.detail : undefined;
+      diagnostics.setResponseStatus(response.status);
+      let rawData: unknown;
+      try {
+        const responseText = await response.text();
+        if (!responseText.trim()) throw new SyntaxError("Empty response body");
+        rawData = JSON.parse(responseText) as unknown;
+      } catch (parseError) {
+        setDownloadError("Vidorac received an invalid response from the service.");
+        setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, "Invalid JSON response"));
+        diagnostics.captureError(parseError, "download-response-parsing");
+        updatePhase(key, null);
+        return;
+      }
+      const data = normalizePreparePayload(rawData);
+      if (!response.ok || data.kind === "error") {
+        const detail = data.kind === "error" ? data.detail : undefined;
         setDownloadError(publicDownloadError(detail));
         setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, detail));
+        diagnostics.captureError(new Error(detail ?? `HTTP ${response.status}`), "download-api-response");
+        updatePhase(key, null);
+        return;
+      }
+      if (data.kind !== "success") {
+        setDownloadError("Vidorac received an invalid response from the service.");
+        setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, "Unexpected response schema"));
+        diagnostics.captureError(new TypeError("Unexpected download response schema"), "download-schema-validation");
         updatePhase(key, null);
         return;
       }
       updatePhase(key, "ready");
       timers.current.push(setTimeout(() => {
         const anchor = document.createElement("a");
-        anchor.href = `${API_BASE_URL}/api/download/${encodeURIComponent(data.download_id)}`;
+        anchor.href = `${API_BASE_URL}/api/download/${encodeURIComponent(data.downloadId)}`;
         anchor.download = data.filename;
         document.body.appendChild(anchor);
         anchor.click();
@@ -361,9 +368,10 @@ export default function Analyzer() {
         setLastDownload({ key, body });
         timers.current.push(setTimeout(() => updatePhase(key, null), 2400));
       }, 350));
-    } catch {
+    } catch (requestError) {
       setDownloadError("We couldn't reach Vidorac's local service. Please try again.");
       setTechnicalError(technicalMessage("POST /api/download/prepare", "NETWORK"));
+      diagnostics.captureError(requestError, "download-fetch");
       updatePhase(key, null);
     }
   }

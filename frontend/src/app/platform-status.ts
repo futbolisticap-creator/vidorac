@@ -14,6 +14,7 @@ export type AnalyzerUrlDecision =
   | { action: "unsupported" }
   | { action: "platform_unavailable"; platform: PlatformId }
   | { action: "instagram_posts_unavailable"; platform: "instagram" };
+export type DiagnosticUrlContext = { platform: PlatformId | "unknown"; type: "reel" | "post" | "other" | "invalid" };
 
 export const platformStatus: Record<PlatformId, PlatformStatus> = {
   youtube: {
@@ -117,6 +118,17 @@ export function getAnalyzerUrlDecision(value: string): AnalyzerUrlDecision {
   }
   if (!isPlatformEnabled(platform)) return { action: "platform_unavailable", platform };
   return { action: "analyze", platform };
+}
+
+export function describeUrlForDiagnostics(value: string): DiagnosticUrlContext {
+  const parsed = parsePublicHttpUrl(value);
+  if (!parsed) return { platform: "unknown", type: "invalid" };
+  const platform = detectPlatform(parsed) ?? "unknown";
+  if (platform !== "instagram") return { platform, type: "other" };
+  const firstSegment = parsed.pathname.split("/").filter(Boolean)[0]?.toLowerCase();
+  if (firstSegment === "reel" || firstSegment === "reels") return { platform, type: "reel" };
+  if (firstSegment === "p") return { platform, type: "post" };
+  return { platform, type: "other" };
 }
 
 export function isInstagramPostCapabilityDisabled(value: string): boolean {

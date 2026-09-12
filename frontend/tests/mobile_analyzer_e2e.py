@@ -84,6 +84,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     )
 
     page.goto(TARGET_URL, wait_until="networkidle")
+    assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
     page.fill("#media-url", POST_URL)
     page.click("button[type=submit]")
     page.get_by_role("heading", name="Instagram photo posts are temporarily unavailable").wait_for()
@@ -121,12 +122,69 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     return result
 
 
+def run_debug_failure_cases(browser) -> None:
+    context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    context.add_init_script(
+        "Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });"
+        "if (globalThis.crypto) { try { Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: undefined }); } catch {} }"
+    )
+    page = context.new_page()
+    debug_url = f"{TARGET_URL.rstrip('/')}?debug=1"
+    page.goto(debug_url, wait_until="networkidle")
+    page.get_by_text("Vidorac Diagnostics", exact=True).wait_for()
+    page.get_by_text("Vidorac Diagnostics", exact=True).click()
+    assert page.get_by_role("button", name="Copy diagnostic report").count() == 0
+
+    page.evaluate("setTimeout(() => { throw new Error('diagnostic-window-test'); }, 0)")
+    page.get_by_text("Last error: window.onerror", exact=False).wait_for()
+    page.evaluate("setTimeout(() => Promise.reject({ message: 'diagnostic-rejection-test' }), 0)")
+    page.get_by_text("Unhandled rejection: {\"message\":\"diagnostic-rejection-test\"}", exact=False).wait_for()
+
+    page.route("**/api/analyze", lambda route: route.abort())
+    page.fill("#media-url", REEL_URL)
+    page.click("button[type=submit]")
+    page.get_by_text("We couldn't reach Vidorac's service. Please try again.", exact=True).wait_for()
+    page.unroute("**/api/analyze")
+
+    page.route(
+        "**/api/analyze",
+        lambda route: route.fulfill(status=503, content_type="application/json", body=json.dumps({"success": False, "detail": "Service temporarily unavailable"})),
+    )
+    page.click("button[type=submit]")
+    page.get_by_text("We couldn't analyze this post. It may be private, removed, or temporarily unavailable.", exact=True).wait_for()
+    page.get_by_text("API response status: 503", exact=False).wait_for()
+    page.unroute("**/api/analyze")
+
+    page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="text/plain", body="not json"))
+    page.click("button[type=submit]")
+    page.get_by_text("Vidorac received an invalid response from the service.", exact=True).wait_for()
+    page.unroute("**/api/analyze")
+
+    page.route(
+        "**/api/analyze",
+        lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps({"success": True, "video": {"media_type": "video"}})),
+    )
+    page.click("button[type=submit]")
+    page.get_by_text("Vidorac received an invalid response from the service.", exact=True).wait_for()
+    page.get_by_text("Last error: analyze-schema-validation", exact=False).wait_for()
+
+    report = page.locator("details pre").inner_text()
+    assert "Analyzer stage: response-parsing" in report, report
+    assert "Last error: analyze-schema-validation" in report
+    assert REEL_URL not in report
+    assert page.get_by_text("Reload", exact=True).count() == 0
+    context.close()
+
+
 with sync_playwright() as playwright:
     executable = browser_executable()
     launch_options = {"headless": True}
     if executable:
         launch_options["executable_path"] = executable
     browser = playwright.chromium.launch(**launch_options)
-    for viewport in VIEWPORTS:
-        print(run_viewport(browser, *viewport), flush=True)
+    if os.environ.get("VIDORAC_TEST_DEBUG_ONLY") != "1":
+        for viewport in VIEWPORTS:
+            print(run_viewport(browser, *viewport), flush=True)
+    run_debug_failure_cases(browser)
+    print({"debug_failure_cases": "passed"}, flush=True)
     browser.close()

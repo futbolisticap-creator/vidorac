@@ -1,11 +1,12 @@
 "use client";
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { useAnalyzerDiagnostics } from "./analyzer-diagnostics";
 
-type Props = { children: ReactNode };
+type Props = { children: ReactNode; onError: (error: unknown, source?: string) => void; onReset: () => void };
 type State = { failed: boolean };
 
-export default class AnalyzerBoundary extends Component<Props, State> {
+class AnalyzerErrorBoundary extends Component<Props, State> {
   state: State = { failed: false };
 
   static getDerivedStateFromError(): State {
@@ -13,6 +14,7 @@ export default class AnalyzerBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    this.props.onError(error, "react-analyzer-boundary");
     if (process.env.NODE_ENV === "development") {
       console.error("Analyzer render failure", error, info.componentStack);
     }
@@ -23,17 +25,25 @@ export default class AnalyzerBoundary extends Component<Props, State> {
     return (
       <div className="analysis-wait-card mx-auto mt-8 max-w-4xl" role="alert">
         <div>
-          <h2>The analyzer encountered an unexpected problem</h2>
-          <p>You can reset it and try another public link without reloading the page.</p>
+          <h2>Something went wrong while processing this link.</h2>
+          <p>Try again without reloading the page.</p>
         </div>
         <button
           type="button"
           className="analysis-retry-button"
-          onClick={() => this.setState({ failed: false })}
+          onClick={() => {
+            this.props.onReset();
+            this.setState({ failed: false });
+          }}
         >
-          Reset analyzer
+          Try again
         </button>
       </div>
     );
   }
+}
+
+export default function AnalyzerBoundary({ children }: { children: ReactNode }) {
+  const diagnostics = useAnalyzerDiagnostics();
+  return <AnalyzerErrorBoundary onError={diagnostics.captureError} onReset={diagnostics.resetAttempt}>{children}</AnalyzerErrorBoundary>;
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  describeUrlForDiagnostics,
   getAnalyzerUrlDecision,
   isCapabilityEnabled,
 } from "../src/app/platform-status.ts";
@@ -31,4 +32,10 @@ test("invalid and incomplete URLs fail without throwing", () => {
 test("missing capability values fail safely", () => {
   assert.equal(isCapabilityEnabled("tiktok", "posts"), false);
   assert.equal(isCapabilityEnabled("reddit", "reels"), false);
+});
+
+test("diagnostic URL context never includes the URL or query", () => {
+  assert.deepEqual(describeUrlForDiagnostics("https://www.instagram.com/reel/ABC/?igsh=secret"), { platform: "instagram", type: "reel" });
+  assert.deepEqual(describeUrlForDiagnostics("https://www.instagram.com/p/ABC/?igsh=secret"), { platform: "instagram", type: "post" });
+  assert.deepEqual(describeUrlForDiagnostics("bad input"), { platform: "unknown", type: "invalid" });
 });
