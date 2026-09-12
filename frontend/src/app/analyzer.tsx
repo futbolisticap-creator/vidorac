@@ -8,6 +8,7 @@ import { API_BASE_URL } from "./api-config";
 import PlatformAvailabilityNotice from "./platform-availability-notice";
 import {
   detectPlatformFromUrl,
+  isInstagramPostCapabilityDisabled,
   isPlatformEnabled,
   platformHosts,
   type PlatformId,
@@ -302,6 +303,24 @@ export default function Analyzer() {
       setError(validation === "invalid" ? "Please paste a valid URL." : "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.");
       return;
     }
+    if (isInstagramPostCapabilityDisabled(url)) {
+      analysisRequestId.current += 1;
+      analysisController.current?.abort();
+      clearAnalysisTimers();
+      setIsAnalyzing(false);
+      setAnalysisWaitState("idle");
+      setUnavailablePlatform(null);
+      setError("Instagram photo and carousel posts are temporarily unavailable. Instagram is currently restricting anonymous access to some public posts. Reels are still supported.");
+      setTechnicalError(null);
+      setMedia(null);
+      setAnalyzedUrl(null);
+      setDownloadError(null);
+      setLastDownload(null);
+      setSelectedItems(new Set());
+      setDownloadPhases({});
+      setRetryUrl(null);
+      return;
+    }
     const platform = detectPlatformFromUrl(url);
     if (!isPlatformEnabled(platform) && platform) {
       analysisRequestId.current += 1;
@@ -439,7 +458,7 @@ export default function Analyzer() {
           {instagramPostUnavailable ? (
             <div id="analyze-error" className="analysis-wait-card" role="alert">
               <div>
-                <h2>Instagram posts are temporarily unavailable</h2>
+                <h2>Instagram photo posts are temporarily unavailable</h2>
                 <p>Instagram is currently restricting anonymous access to some photo and carousel posts. Instagram Reels are still supported.</p>
               </div>
               <button type="button" onClick={clearAnalyzer} className="analysis-retry-button">Try another link</button>

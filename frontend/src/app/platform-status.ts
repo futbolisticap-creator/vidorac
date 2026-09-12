@@ -81,3 +81,15 @@ export function detectPlatformFromUrl(value: string): PlatformId | null {
 export function isPlatformEnabled(platform: PlatformId | null): boolean {
   return platform === null || platformStatus[platform].enabled;
 }
+
+export function isInstagramPostCapabilityDisabled(value: string): boolean {
+  if (platformStatus.instagram.capabilities?.posts !== false) return false;
+  try {
+    const parsed = new URL(value.trim());
+    const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+    const isInstagram = platformHosts.instagram.some((host) => matchesHostname(hostname, host));
+    return isInstagram && /^\/p\/[^/]+\/?$/.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}

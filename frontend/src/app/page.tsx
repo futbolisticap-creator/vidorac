@@ -90,7 +90,12 @@ export default function Home() {
 
         <div className="platform-strip mt-5" aria-label="Supported platforms">
           {platforms.map(({ id, name, icon: Icon, color }) => (
-            <span key={name} className="platform-item">
+            <span
+              key={name}
+              className="platform-item"
+              title={id === "instagram" ? "Instagram Reels supported. Photo posts temporarily unavailable." : undefined}
+              aria-label={id === "instagram" ? "Instagram: Reels supported. Photo posts temporarily unavailable." : name}
+            >
               <Icon className={`size-[1.05rem] ${color}`} />
               {name}
               {!platformStatus[id].enabled && <span className="platform-status-badge">Unavailable</span>}
