@@ -10,12 +10,16 @@ from app.analyzer import InvalidUrlError, UnsupportedUrlError
 from app.downloader import (
     MAX_FILESIZE_BYTES,
     MAX_DURATION_SECONDS,
+    DEFAULT_MP3_BITRATE,
     DownloadQuality,
     DownloadPreparationError,
     FFmpegRequiredError,
+    FileSizeLimitError,
+    Mp3Bitrate,
     ContentRemovedError,
     SourceBlockedError,
     TemporaryUnavailableError,
+    _encode_mp3,
     _map_download_error,
     build_orientation_aware_format_selector,
     build_ydl_options,
@@ -35,6 +39,40 @@ class QualityValidationTests(unittest.TestCase):
     def test_rejects_arbitrary_quality(self) -> None:
         with self.assertRaises(ValidationError):
             DownloadRequest(url="https://youtu.be/test", quality="4k")
+
+    def test_accepts_only_supported_mp3_bitrates(self) -> None:
+        for bitrate in (128, 192, 320):
+            with self.subTest(bitrate=bitrate):
+                request = DownloadRequest(
+                    url="https://www.tiktok.com/@creator/video/123",
+                    quality="mp3",
+                    audio_bitrate=bitrate,
+                )
+                self.assertEqual(request.audio_bitrate.value, bitrate)
+
+    def test_mp3_bitrate_defaults_to_192(self) -> None:
+        request = DownloadRequest(
+            url="https://www.tiktok.com/@creator/video/123",
+            quality="mp3",
+        )
+        self.assertEqual(request.audio_bitrate, DEFAULT_MP3_BITRATE)
+
+    def test_rejects_invalid_or_non_integer_mp3_bitrates(self) -> None:
+        for bitrate in (0, 999, "192", "320k; rm -rf", True):
+            with self.subTest(bitrate=bitrate), self.assertRaises(ValidationError):
+                DownloadRequest(
+                    url="https://www.tiktok.com/@creator/video/123",
+                    quality="mp3",
+                    audio_bitrate=bitrate,
+                )
+
+    def test_rejects_audio_bitrate_for_non_mp3_downloads(self) -> None:
+        with self.assertRaises(ValidationError):
+            DownloadRequest(
+                url="https://www.tiktok.com/@creator/video/123",
+                quality="best",
+                audio_bitrate=192,
+            )
 
     def test_gallery_indices_require_real_integers(self) -> None:
         for invalid in ([-1.5], ["1"], [True]):
@@ -115,6 +153,11 @@ class DownloadValidationTests(unittest.TestCase):
             patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
             patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
             patch("app.downloader.is_ffmpeg_available", return_value=True),
+            patch("app.downloader.require_encoders"),
+            patch(
+                "app.downloader.run_ffmpeg",
+                side_effect=lambda arguments: Path(arguments[-1]).write_bytes(b"ID3 encoded test audio"),
+            ),
         ):
             artifact = download_media("https://www.tiktok.com/@creator/video/123", DownloadQuality.MP3)
 
@@ -125,6 +168,53 @@ class DownloadValidationTests(unittest.TestCase):
         finally:
             artifact.path.unlink(missing_ok=True)
             artifact.temp_directory.rmdir()
+
+    def test_failed_mp3_encoding_cleans_temporary_files(self) -> None:
+        temp_path = Path(tempfile.mkdtemp(prefix="clipora-test-"))
+        downloader = MagicMock()
+
+        def write_download(_url: str, *, download: bool) -> dict[str, object]:
+            (temp_path / "123.mp3").write_bytes(b"source audio")
+            return {"id": "123", "title": "Public TikTok"}
+
+        downloader.__enter__.return_value.extract_info.side_effect = write_download
+        with (
+            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
+            patch("app.downloader.is_ffmpeg_available", return_value=True),
+            patch("app.downloader.require_encoders"),
+            patch("app.downloader.run_ffmpeg", side_effect=RuntimeError("conversion failed")),
+            self.assertRaises(DownloadPreparationError),
+        ):
+            download_media("https://www.tiktok.com/@creator/video/123", DownloadQuality.MP3)
+
+        self.assertFalse(temp_path.exists())
+
+    def test_mp3_output_size_limit_is_enforced_after_encoding(self) -> None:
+        temp_path = Path(tempfile.mkdtemp(prefix="clipora-test-"))
+        downloader = MagicMock()
+
+        def write_download(_url: str, *, download: bool) -> dict[str, object]:
+            (temp_path / "123.mp3").write_bytes(b"source audio")
+            return {"id": "123", "title": "Public TikTok"}
+
+        def write_large_output(arguments: list[str]) -> None:
+            with Path(arguments[-1]).open("wb") as output:
+                output.seek(MAX_FILESIZE_BYTES)
+                output.write(b"0")
+
+        downloader.__enter__.return_value.extract_info.side_effect = write_download
+        with (
+            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
+            patch("app.downloader.is_ffmpeg_available", return_value=True),
+            patch("app.downloader.require_encoders"),
+            patch("app.downloader.run_ffmpeg", side_effect=write_large_output),
+            self.assertRaises(FileSizeLimitError),
+        ):
+            download_media("https://www.tiktok.com/@creator/video/123", DownloadQuality.MP3)
+
+        self.assertFalse(temp_path.exists())
 
 
 class PresetTests(unittest.TestCase):
@@ -246,18 +336,61 @@ class PresetTests(unittest.TestCase):
         self.assertIsNotNone(reason)
         self.assertEqual(state["reason"], "duration")
 
-    def test_mp3_preset_uses_ffmpeg_at_192_kbps(self) -> None:
+    def test_mp3_download_selects_the_best_available_audio_source(self) -> None:
+        for bitrate in Mp3Bitrate:
+            with self.subTest(bitrate=bitrate.value), tempfile.TemporaryDirectory() as directory:
+                options, _state = build_ydl_options(
+                    DownloadQuality.MP3,
+                    Path(directory),
+                    ffmpeg_available=True,
+                    audio_bitrate=bitrate,
+                )
+            self.assertEqual(options["format"], "bestaudio/best")
+            self.assertNotIn("postprocessors", options)
+
+    def test_mp3_encoder_uses_safe_arguments_for_each_validated_bitrate(self) -> None:
+        for bitrate in Mp3Bitrate:
+            with self.subTest(bitrate=bitrate.value), tempfile.TemporaryDirectory() as directory:
+                temp_path = Path(directory)
+                source_path = temp_path / "source.mp3"
+                source_path.write_bytes(b"source audio")
+                with (
+                    patch("app.downloader.require_encoders") as require,
+                    patch("app.downloader.run_ffmpeg") as runner,
+                ):
+                    output_path = _encode_mp3(source_path, temp_path, bitrate)
+
+            require.assert_called_once_with("libmp3lame")
+            runner.assert_called_once_with(
+                [
+                    "-i", str(source_path),
+                    "-vn", "-map", "0:a:0", "-map_metadata", "-1",
+                    "-c:a", "libmp3lame", "-b:a", f"{bitrate.value}k",
+                    str(output_path),
+                ]
+            )
+
+    def test_mp3_preset_defaults_to_192_kbps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             options, _state = build_ydl_options(
                 DownloadQuality.MP3,
                 Path(directory),
                 ffmpeg_available=True,
             )
-        self.assertEqual(options["format"], "bestaudio/best")
-        self.assertEqual(
-            options["postprocessors"],
-            [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}],
-        )
+            reason = options["match_filter"]({"duration": 60}, incomplete=False)
+        self.assertIsNone(reason)
+
+    def test_mp3_size_estimate_uses_selected_bitrate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            options, state = build_ydl_options(
+                DownloadQuality.MP3,
+                Path(directory),
+                ffmpeg_available=True,
+                audio_bitrate=Mp3Bitrate.KBPS_320,
+            )
+            reason = options["match_filter"]({"duration": 2 * 60 * 60}, incomplete=False)
+        self.assertIsNotNone(reason)
+        self.assertEqual(state["reason"], "filesize")
 
     def test_mp3_requires_ffmpeg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

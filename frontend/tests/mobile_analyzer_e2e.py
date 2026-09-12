@@ -78,6 +78,8 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page_errors: list[str] = []
     console_errors: list[str] = []
     analyze_requests: list[str] = []
+    prepare_requests: list[dict] = []
+    pending_prepare_routes = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
     page.on("request", lambda request: analyze_requests.append(request.url) if "/api/analyze" in request.url else None)
@@ -85,6 +87,12 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
         "**/api/analyze",
         lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE)),
     )
+
+    def hold_prepare(route) -> None:
+        prepare_requests.append(route.request.post_data_json)
+        pending_prepare_routes.append(route)
+
+    page.route("**/api/download/prepare", hold_prepare)
 
     page.goto(TARGET_URL, wait_until="networkidle")
     assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
@@ -94,6 +102,31 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.get_by_role("button", name="Download MP3").wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
     assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
+
+    bitrate_128 = page.get_by_role("button", name="128 kbps Small")
+    bitrate_192 = page.get_by_role("button", name="192 kbps Recommended")
+    bitrate_320 = page.get_by_role("button", name="320 kbps High")
+    assert bitrate_192.get_attribute("aria-pressed") == "true", f"{name}: 192 kbps is not selected by default"
+    bitrate_128.click()
+    assert bitrate_128.get_attribute("aria-pressed") == "true", f"{name}: 128 kbps selection failed"
+    bitrate_320.click()
+    assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: 320 kbps selection failed"
+    assert len(analyze_requests) == 1, f"{name}: changing MP3 bitrate repeated analysis"
+
+    page.get_by_role("button", name="Download MP3").click()
+    page.wait_for_timeout(100)
+    assert len(pending_prepare_routes) == 1, f"{name}: MP3 preparation was not requested"
+    assert bitrate_128.is_disabled() and bitrate_192.is_disabled() and bitrate_320.is_disabled(), f"{name}: bitrate controls stayed enabled during preparation"
+    assert prepare_requests[0]["audio_bitrate"] == 320, f"{name}: selected MP3 bitrate was not sent"
+    pending_prepare_routes[0].fulfill(
+        status=500,
+        content_type="application/json",
+        body=json.dumps({"success": False, "detail": "Download could not be prepared."}),
+    )
+    page.get_by_text("We couldn't prepare this MP3. Please try again.", exact=True).wait_for()
+    assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: failed preparation lost selected bitrate"
+    assert not bitrate_320.is_disabled(), f"{name}: controls did not recover after preparation failure"
+    console_errors.clear()  # The intentional HTTP 500 above is expected to reach the browser console.
 
     page.get_by_role("button", name="Download another").click()
     for unsupported_url in UNSUPPORTED_URLS:

@@ -17,6 +17,11 @@ import {
   describeUrlForDiagnostics,
   getAnalyzerUrlDecision,
 } from "./platform-status";
+import {
+  DEFAULT_MP3_BITRATE,
+  MP3_BITRATE_OPTIONS,
+  type Mp3Bitrate,
+} from "./mp3-options";
 import { SupportCard } from "./support-button";
 
 const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
@@ -30,7 +35,7 @@ type AnalysisWaitState =
   | "timed-out";
 
 type DownloadPhase = "preparing" | "ready" | "started";
-type DownloadBody = { url: string; quality?: QualityOption["id"]; item_indices?: number[]; archive?: boolean };
+type DownloadBody = { url: string; quality?: QualityOption["id"]; audio_bitrate?: Mp3Bitrate; item_indices?: number[]; archive?: boolean };
 type LastDownload = { key: string; body: DownloadBody };
 
 function formatDuration(duration: number | null): string | null {
@@ -84,6 +89,14 @@ function publicDownloadError(detail?: string): string {
   return "We couldn't prepare this download. Please try again.";
 }
 
+function downloadPreparationError(body: DownloadBody, detail?: string): string {
+  const message = publicDownloadError(detail);
+  if (body.quality === "mp3" && message === "We couldn't prepare this download. Please try again.") {
+    return "We couldn't prepare this MP3. Please try again.";
+  }
+  return message;
+}
+
 function technicalMessage(endpoint: string, status: number | "NETWORK", detail?: string): string {
   const safeDetail = (detail || "No public detail").replace(/[\r\n\t]+/g, " ").slice(0, 240);
   return `${endpoint} · ${status === "NETWORK" ? "Network error" : `HTTP ${status}`} · ${safeDetail}`;
@@ -113,6 +126,7 @@ export default function Analyzer() {
   const [downloadPhases, setDownloadPhases] = useState<Record<string, DownloadPhase>>({});
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [lastDownload, setLastDownload] = useState<LastDownload | null>(null);
+  const [mp3Bitrate, setMp3Bitrate] = useState<Mp3Bitrate>(DEFAULT_MP3_BITRATE);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [failedPreviews, setFailedPreviews] = useState<Set<number>>(new Set());
   const [analysisWaitState, setAnalysisWaitState] = useState<AnalysisWaitState>("idle");
@@ -303,7 +317,7 @@ export default function Analyzer() {
       const data = normalizePreparePayload(rawData);
       if (!response.ok || data.kind === "error") {
         const detail = data.kind === "error" ? data.detail : undefined;
-        setDownloadError(publicDownloadError(detail));
+        setDownloadError(downloadPreparationError(body, detail));
         setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, detail));
         diagnostics.captureError(new Error(detail ?? `HTTP ${response.status}`), "download-api-response");
         updatePhase(key, null);
@@ -336,7 +350,13 @@ export default function Analyzer() {
     }
   }
 
-  function handleQuality(quality: QualityOption["id"]) { if (analyzedUrl) void prepareDownload({ url: analyzedUrl, quality }, `quality:${quality}`); }
+  function handleQuality(quality: QualityOption["id"]) {
+    if (!analyzedUrl) return;
+    const body: DownloadBody = quality === "mp3"
+      ? { url: analyzedUrl, quality, audio_bitrate: mp3Bitrate }
+      : { url: analyzedUrl, quality };
+    void prepareDownload(body, `quality:${quality}`);
+  }
   function handleItem(index: number) { if (analyzedUrl) void prepareDownload({ url: analyzedUrl, item_indices: [index] }, `item:${index}`); }
   function handleAll() { if (analyzedUrl) void prepareDownload({ url: analyzedUrl }, "all"); }
   function handleSelected() {
@@ -375,7 +395,7 @@ export default function Analyzer() {
     analysisRequestId.current += 1;
     analysisController.current?.abort();
     analysisController.current = null;
-    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setIsAnalyzing(false);
+    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setMp3Bitrate(DEFAULT_MP3_BITRATE); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setIsAnalyzing(false);
     const focusInput = () => inputRef.current?.focus();
     if (typeof window === "undefined") focusInput();
     else window.requestAnimationFrame(focusInput);
@@ -427,7 +447,7 @@ export default function Analyzer() {
             const size = formatEstimatedSize(quality.estimated_size_bytes);
             const details = quality.available ? [quality.id === "best" ? "Highest quality" : quality.id === "compatible" ? "Most compatible" : null, quality.resolution, quality.container, quality.video_codec, size].filter(Boolean) : ["Unavailable"];
             return <button key={quality.id} type="button" disabled={phase === "preparing" || !quality.available} onClick={() => handleQuality(quality.id)} title={!quality.available ? `${quality.label} is not available for this video` : undefined} className={`flex min-h-16 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-not-allowed ${phase ? "border-[#34a5ff]/40 bg-[#1682ff]/20 text-[#9bdcff]" : index < 2 ? "border-[#2389ff]/30 bg-[#1682ff]/10 text-[#84ceff] hover:border-[#45a6ff]/50 hover:bg-[#1682ff]/15 disabled:opacity-40" : "border-white/[0.09] bg-white/[0.035] text-white/65 hover:border-white/20 hover:bg-white/[0.07] disabled:opacity-35"}`}>{phase === "preparing" && <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-[#88d5ff]/25 border-t-[#88d5ff]" />}<span className="flex min-w-0 flex-col gap-0.5"><span>{phase === "preparing" ? "Preparing..." : phase === "ready" ? "Download ready" : phase === "started" ? "Download started" : quality.label}</span>{!phase && <span className="truncate text-xs font-normal text-white/35">{details.join(" · ")}</span>}</span></button>;
-          })}</div></section><section aria-labelledby="audio-download-title" className="rounded-xl border border-[#2389ff]/20 bg-[#1682ff]/[0.045] p-3 sm:p-4"><p className="section-label !text-[0.66rem]">Audio</p><h3 id="audio-download-title" className="mt-1 text-sm font-semibold text-white/90">TikTok audio</h3><p className="mt-2 text-xs leading-5 text-white/40">Extract the available audio as an MP3 file.</p>{mp3Quality ? (() => { const key = "quality:mp3"; const phase = downloadPhases[key]; return <button type="button" disabled={phase === "preparing"} onClick={() => handleQuality("mp3")} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70">{phase === "preparing" && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{phase === "preparing" ? "Preparing MP3..." : phase === "ready" ? "MP3 ready" : phase === "started" ? "Download started" : "Download MP3"}</button>; })() : <p className="mt-4 rounded-lg border border-white/[0.07] px-3 py-2.5 text-xs text-white/35">MP3 is not available for this TikTok.</p>}</section></div> : gallery?.media_type === "image" ? <><div><p className="section-label !text-[0.66rem]">TikTok photo</p><h3 className="mt-1 text-sm font-semibold text-white/90">Download image</h3></div><button type="button" disabled={downloadPhases.all === "preparing"} onClick={handleAll} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(20,120,255,0.2)] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70 sm:w-auto">{downloadPhases.all === "preparing" && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{downloadPhases.all === "preparing" ? "Preparing..." : downloadPhases.all === "ready" ? "Download ready" : downloadPhases.all === "started" ? "Download started" : "Download Image"}</button></> : gallery ? <>
+          })}</div></section><section aria-labelledby="audio-download-title" className="rounded-xl border border-[#2389ff]/20 bg-[#1682ff]/[0.045] p-3 sm:p-4"><p className="section-label !text-[0.66rem]">Audio</p><h3 id="audio-download-title" className="mt-1 text-sm font-semibold text-white/90">TikTok audio</h3><p className="mt-2 text-xs leading-5 text-white/40">Extract the available audio as an MP3 file.</p>{mp3Quality ? (() => { const key = "quality:mp3"; const phase = downloadPhases[key]; const preparing = phase === "preparing"; return <><fieldset disabled={preparing} className="mt-3"><legend className="text-xs font-medium text-white/65">Audio quality</legend><div className="mt-2 grid grid-cols-3 gap-1.5">{MP3_BITRATE_OPTIONS.map((option) => { const selected = option.value === mp3Bitrate; return <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMp3Bitrate(option.value)} className={`min-h-14 rounded-lg border px-1.5 py-2 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-55 ${selected ? "border-[#45b7ff]/55 bg-[#1682ff]/20 text-white shadow-[inset_0_0_0_1px_rgba(104,211,255,0.08)]" : "border-white/[0.08] bg-white/[0.025] text-white/55 hover:border-white/20 hover:bg-white/[0.05]"}`}><span className="block text-[0.68rem] font-semibold leading-4 sm:text-xs">{option.label}</span><span className={`mt-0.5 block text-[0.58rem] leading-3 sm:text-[0.65rem] ${selected ? "text-[#7fd5ff]" : "text-white/30"}`}>{option.description}</span></button>; })}</div></fieldset><p className="mt-2 text-[0.65rem] leading-4 text-white/30">Higher bitrate creates a larger MP3 file. It does not improve the original TikTok audio quality.</p><button type="button" disabled={preparing} onClick={() => handleQuality("mp3")} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70">{preparing && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{preparing ? "Preparing MP3..." : phase === "ready" ? "MP3 ready" : phase === "started" ? "Download started" : "Download MP3"}</button></>; })() : <p className="mt-4 rounded-lg border border-white/[0.07] px-3 py-2.5 text-xs text-white/35">MP3 is not available for this TikTok.</p>}</section></div> : gallery?.media_type === "image" ? <><div><p className="section-label !text-[0.66rem]">TikTok photo</p><h3 className="mt-1 text-sm font-semibold text-white/90">Download image</h3></div><button type="button" disabled={downloadPhases.all === "preparing"} onClick={handleAll} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(20,120,255,0.2)] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70 sm:w-auto">{downloadPhases.all === "preparing" && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{downloadPhases.all === "preparing" ? "Preparing..." : downloadPhases.all === "ready" ? "Download ready" : downloadPhases.all === "started" ? "Download started" : "Download Image"}</button></> : gallery ? <>
             <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="section-label !text-[0.66rem]">Slideshow</p><h3 className="mt-1 text-sm font-semibold text-white/90">TikTok Slideshow</h3><p className="mt-1 text-xs text-white/40">Download one image, select several, or get the complete slideshow.</p></div>{selectedItems.size > 0 && <button type="button" onClick={() => setSelectedItems(new Set())} className="text-xs text-white/45 hover:text-white">Clear selection</button>}</div>
             <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{gallery.items.map((item) => {
               const key = `item:${item.index}`;

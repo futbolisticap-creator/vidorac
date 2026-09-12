@@ -151,6 +151,32 @@ class DownloadEndpointTests(unittest.TestCase):
             force_archive=True,
         )
 
+    def test_mp3_prepare_passes_each_validated_bitrate_to_downloader(self) -> None:
+        from app.downloader import DownloadQuality, Mp3Bitrate
+
+        for bitrate in (128, 192, 320):
+            with self.subTest(bitrate=bitrate), patch(
+                "app.main.download_media",
+                return_value=make_artifact(f"audio-{bitrate}.mp3"),
+            ) as downloader:
+                response = asyncio.run(
+                    prepare_download(
+                        DownloadRequest(
+                            url="https://www.tiktok.com/@creator/video/123",
+                            quality="mp3",
+                            audio_bitrate=bitrate,
+                        ),
+                        make_http_request(),
+                    )
+                )
+
+            self.assertTrue(response["success"])
+            downloader.assert_called_once_with(
+                "https://www.tiktok.com/@creator/video/123",
+                DownloadQuality.MP3,
+                Mp3Bitrate(bitrate),
+            )
+
     def test_preparing_again_creates_a_new_download_id(self) -> None:
         with patch("app.main.download_media", side_effect=[make_artifact("first.mp4"), make_artifact("second.mp4")]):
             first = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best"), make_http_request()))

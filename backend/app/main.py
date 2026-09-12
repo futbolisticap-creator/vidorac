@@ -9,7 +9,7 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, StrictInt, model_validator
+from pydantic import BaseModel, StrictInt, field_validator, model_validator
 from starlette.background import BackgroundTask
 
 from .analyzer import (
@@ -29,12 +29,14 @@ from .downloader import (
     ContentRemovedError,
     DownloadPreparationError,
     DownloadQuality,
+    DEFAULT_MP3_BITRATE,
     DurationLimitError,
     FFmpegRequiredError,
     FileSizeLimitError,
     FormatUnavailableError,
     ExtractorChangedError,
     MediaUnavailableError,
+    Mp3Bitrate,
     NetworkTimeoutError,
     SourceBlockedError,
     TemporaryUnavailableError,
@@ -155,8 +157,16 @@ class AnalyzeRequest(BaseModel):
 class DownloadRequest(BaseModel):
     url: str
     quality: DownloadQuality | None = None
+    audio_bitrate: Mp3Bitrate | None = None
     item_indices: list[StrictInt] | None = None
     archive: bool = False
+
+    @field_validator("audio_bitrate", mode="before")
+    @classmethod
+    def validate_audio_bitrate_type(cls, value):
+        if value is not None and type(value) is not int:
+            raise ValueError("Audio bitrate must be an integer")
+        return value
 
     @model_validator(mode="after")
     def validate_download_kind(self) -> "DownloadRequest":
@@ -164,6 +174,10 @@ class DownloadRequest(BaseModel):
             raise ValueError("Video qualities cannot include gallery selections")
         if self.archive and self.item_indices == []:
             raise ValueError("Selected downloads require at least one item")
+        if self.quality is DownloadQuality.MP3:
+            self.audio_bitrate = self.audio_bitrate or DEFAULT_MP3_BITRATE
+        elif self.audio_bitrate is not None:
+            raise ValueError("Audio bitrate is only valid for MP3 downloads")
         return self
 
 
@@ -552,6 +566,7 @@ async def prepare_download(
                 download_media,
                 request.url,
                 request.quality,
+                request.audio_bitrate,
             )
     except (DownloadPreparationError, GalleryError) as error:
         return download_error_response(error, platform=platform)

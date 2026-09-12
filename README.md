@@ -24,7 +24,7 @@ The project directory may still be named `Clipora` locally while the product and
 ## Public product support
 
 - Public TikTok videos with real available quality choices
-- TikTok audio converted server-side to MP3 at 192 kbps when available
+- TikTok audio converted server-side to MP3 at 128, 192, or 320 kbps when available; 192 kbps is the default
 - Public TikTok photo posts and slideshows with individual, selected, or complete ZIP downloads
 
 Only individual public TikTok posts are accepted by the website. Profiles, feeds, hashtags, private content, and login-dependent posts are rejected. Downloads are limited to 250 MB. No cookies, private sessions, or login data are used.
@@ -113,7 +113,7 @@ Invoke-WebRequest `
   -OutFile ".\vidorac-test.mp4"
 ```
 
-For MP3, change `quality` to `"mp3"` and the output filename to `vidorac-test.mp3`.
+For MP3, change `quality` to `"mp3"`, optionally add `audio_bitrate = 128`, `192`, or `320`, and use `vidorac-test.mp3` as the output filename. Omitting `audio_bitrate` keeps the backward-compatible 192 kbps default. The selected bitrate controls output encoding and file size; it cannot improve audio detail absent from the TikTok source.
 
 Prepared downloads expire after 15 minutes and are single-use. Expired, delivered, failed, and missing temporary files are removed automatically. The in-memory registry is cleared when the backend shuts down normally.
 

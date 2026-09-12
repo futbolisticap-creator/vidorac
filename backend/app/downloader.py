@@ -18,6 +18,7 @@ import yt_dlp
 
 from .analyzer import ensure_individual_media_url, validate_and_classify_url
 from .format_presets import infer_output_container, select_streams
+from .tools.ffmpeg_runner import require_encoders, run_ffmpeg
 
 
 logger = logging.getLogger("clipora.downloader")
@@ -43,6 +44,15 @@ class DownloadQuality(str, Enum):
     HD_720 = "720"
     SD_480 = "480"
     MP3 = "mp3"
+
+
+class Mp3Bitrate(int, Enum):
+    KBPS_128 = 128
+    KBPS_192 = 192
+    KBPS_320 = 320
+
+
+DEFAULT_MP3_BITRATE = Mp3Bitrate.KBPS_192
 
 
 class DownloadPreparationError(RuntimeError):
@@ -148,6 +158,42 @@ def _find_output_file(temp_directory: Path, quality: DownloadQuality) -> Path:
     return max(candidates, key=lambda path: path.stat().st_size)
 
 
+def _find_downloaded_audio_source(temp_directory: Path) -> Path:
+    ignored_suffixes = {".part", ".ytdl", ".json", ".description"}
+    candidates = [
+        path
+        for path in temp_directory.iterdir()
+        if path.is_file()
+        and path.suffix.lower() not in ignored_suffixes
+        and path.name != "vidorac-encoded-output.mp3"
+    ]
+    if not candidates:
+        raise FormatUnavailableError
+    return max(candidates, key=lambda path: path.stat().st_size)
+
+
+def _encode_mp3(
+    source_path: Path,
+    temp_directory: Path,
+    audio_bitrate: Mp3Bitrate,
+) -> Path:
+    output_path = temp_directory / "vidorac-encoded-output.mp3"
+    require_encoders("libmp3lame")
+    run_ffmpeg(
+        [
+            "-i", str(source_path),
+            "-vn", "-map", "0:a:0", "-map_metadata", "-1",
+            "-c:a", "libmp3lame", "-b:a", f"{audio_bitrate.value}k",
+            str(output_path),
+        ]
+    )
+    try:
+        source_path.unlink()
+    except OSError:
+        logger.warning("Could not remove the downloaded audio source after MP3 encoding")
+    return output_path
+
+
 def _map_download_error(message: str, *, ffmpeg_available: bool) -> DownloadPreparationError:
     lowered = message.lower()
     if any(term in lowered for term in ("timed out", "timeout", "connection reset", "network is unreachable")):
@@ -228,6 +274,7 @@ def build_ydl_options(
     temp_directory: Path,
     *,
     ffmpeg_available: bool,
+    audio_bitrate: Mp3Bitrate = DEFAULT_MP3_BITRATE,
 ) -> tuple[dict[str, Any], dict[str, str | None]]:
     limit_state: dict[str, str | None] = {"reason": None}
 
@@ -238,6 +285,13 @@ def build_ydl_options(
         if isinstance(duration, (int, float)) and duration > MAX_DURATION_SECONDS:
             limit_state["reason"] = "duration"
             return "Video exceeds Vidorac's duration limit"
+        if (
+            quality is DownloadQuality.MP3
+            and isinstance(duration, (int, float))
+            and duration * audio_bitrate.value * 1_000 / 8 > MAX_FILESIZE_BYTES
+        ):
+            limit_state["reason"] = "filesize"
+            return "MP3 exceeds Vidorac's file-size limit"
         return None
 
     def progress_hook(status: dict[str, Any]) -> None:
@@ -286,14 +340,6 @@ def build_ydl_options(
         options.update(
             {
                 "format": "bestaudio/best",
-                "final_ext": "mp3",
-                "postprocessors": [
-                    {
-                        "key": "FFmpegExtractAudio",
-                        "preferredcodec": "mp3",
-                        "preferredquality": "192",
-                    }
-                ],
             }
         )
     else:
@@ -307,7 +353,11 @@ def build_ydl_options(
     return options, limit_state
 
 
-def download_media(raw_url: str, quality: DownloadQuality) -> DownloadArtifact:
+def download_media(
+    raw_url: str,
+    quality: DownloadQuality,
+    audio_bitrate: Mp3Bitrate | None = None,
+) -> DownloadArtifact:
     url, platform = validate_and_classify_url(raw_url)
     ensure_individual_media_url(url, platform)
     temp_directory = Path(tempfile.mkdtemp(prefix="clipora-"))
@@ -318,6 +368,7 @@ def download_media(raw_url: str, quality: DownloadQuality) -> DownloadArtifact:
             quality,
             temp_directory,
             ffmpeg_available=ffmpeg_available,
+            audio_bitrate=audio_bitrate or DEFAULT_MP3_BITRATE,
         )
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -329,7 +380,15 @@ def download_media(raw_url: str, quality: DownloadQuality) -> DownloadArtifact:
         if not isinstance(info, dict) or info.get("_type") in {"playlist", "multi_video"} or info.get("entries") is not None:
             raise MediaUnavailableError
 
-        output_path = _find_output_file(temp_directory, quality)
+        if quality is DownloadQuality.MP3:
+            source_path = _find_downloaded_audio_source(temp_directory)
+            output_path = _encode_mp3(
+                source_path,
+                temp_directory,
+                audio_bitrate or DEFAULT_MP3_BITRATE,
+            )
+        else:
+            output_path = _find_output_file(temp_directory, quality)
         if output_path.stat().st_size > MAX_FILESIZE_BYTES:
             raise FileSizeLimitError
 
