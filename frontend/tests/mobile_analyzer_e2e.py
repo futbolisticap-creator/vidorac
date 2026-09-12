@@ -8,10 +8,10 @@ from playwright.sync_api import sync_playwright
 
 
 TARGET_URL = os.environ.get("VIDORAC_TEST_URL", "http://localhost:3000/")
-POST_URL = "https://www.instagram.com/p/ABC123/?igsh=test"
-REEL_URL = "https://www.instagram.com/reel/ABC123/"
-CONTROL_URLS = (
-    "https://www.tiktok.com/@example/video/1234567890123456789",
+TIKTOK_URL = "https://www.tiktok.com/@example/video/1234567890123456789"
+UNSUPPORTED_URLS = (
+    "https://www.instagram.com/reel/ABC123/",
+    "https://youtu.be/example",
     "https://www.reddit.com/r/videos/comments/abc123/example/",
 )
 VIEWPORTS = (
@@ -37,10 +37,13 @@ VIDEO_RESPONSE = {
         "thumbnail": None,
         "duration": 12,
         "uploader": "Vidorac test",
-        "platform": "instagram",
-        "webpage_url": REEL_URL,
+        "platform": "tiktok",
+        "webpage_url": TIKTOK_URL,
         "max_height": 1080,
-        "quality_options": [],
+        "quality_options": [
+            {"id": "best", "label": "Best Quality", "available": True, "resolution": "1080p", "container": "MP4", "video_codec": "H.264", "estimated_size_bytes": 10_000_000},
+            {"id": "mp3", "label": "MP3", "available": True, "resolution": None, "container": "MP3", "video_codec": None, "estimated_size_bytes": 1_000_000},
+        ],
     },
 }
 
@@ -85,25 +88,21 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
 
     page.goto(TARGET_URL, wait_until="networkidle")
     assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
-    page.fill("#media-url", POST_URL)
-    page.click("button[type=submit]")
-    page.get_by_role("heading", name="Instagram photo posts are temporarily unavailable").wait_for()
-    assert not analyze_requests, f"{name}: Instagram /p/ called /api/analyze"
-
-    page.get_by_role("button", name="Try another link").click()
-    page.fill("#media-url", REEL_URL)
+    page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("Mobile regression fixture").wait_for()
-    assert len(analyze_requests) == 1, f"{name}: Reel did not call /api/analyze exactly once"
+    page.get_by_role("button", name="Download MP3").wait_for()
+    page.get_by_role("heading", name="Download video").wait_for()
+    assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
 
-    for control_url in CONTROL_URLS:
-        page.get_by_role("button", name="Download another").click()
-        page.fill("#media-url", control_url)
+    page.get_by_role("button", name="Download another").click()
+    for unsupported_url in UNSUPPORTED_URLS:
+        page.fill("#media-url", unsupported_url)
         page.click("button[type=submit]")
-        page.get_by_text("Mobile regression fixture").wait_for()
-    assert len(analyze_requests) == 3, f"{name}: control platforms did not preserve analysis"
+        page.locator("#analyze-error").get_by_text("TikTok links only", exact=False).wait_for()
+    assert len(analyze_requests) == 1, f"{name}: unsupported platform called /api/analyze"
 
-    page.get_by_role("button", name="Paste URL from clipboard").click()
+    page.get_by_role("button", name="Paste TikTok URL from clipboard").click()
     page.get_by_text("Unable to access the clipboard. Paste the link manually.", exact=True).wait_for()
     overflow = page.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth")
     reload_screen = page.get_by_text("Reload", exact=True).count() > 0
@@ -141,7 +140,7 @@ def run_debug_failure_cases(browser) -> None:
     page.get_by_text("Unhandled rejection: {\"message\":\"diagnostic-rejection-test\"}", exact=False).wait_for()
 
     page.route("**/api/analyze", lambda route: route.abort())
-    page.fill("#media-url", REEL_URL)
+    page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("We couldn't reach Vidorac's service. Please try again.", exact=True).wait_for()
     page.unroute("**/api/analyze")
@@ -151,7 +150,7 @@ def run_debug_failure_cases(browser) -> None:
         lambda route: route.fulfill(status=503, content_type="application/json", body=json.dumps({"success": False, "detail": "Service temporarily unavailable"})),
     )
     page.click("button[type=submit]")
-    page.get_by_text("We couldn't analyze this post. It may be private, removed, or temporarily unavailable.", exact=True).wait_for()
+    page.get_by_text("This TikTok could not be accessed. It may be private, removed, or temporarily unavailable.", exact=True).wait_for()
     page.get_by_text("API response status: 503", exact=False).wait_for()
     page.unroute("**/api/analyze")
 
@@ -171,7 +170,7 @@ def run_debug_failure_cases(browser) -> None:
     report = page.locator("details pre").inner_text()
     assert "Analyzer stage: response-parsing" in report, report
     assert "Last error: analyze-schema-validation" in report
-    assert REEL_URL not in report
+    assert TIKTOK_URL not in report
     assert page.get_by_text("Reload", exact=True).count() == 0
     context.close()
 
@@ -183,8 +182,14 @@ with sync_playwright() as playwright:
         launch_options["executable_path"] = executable
     browser = playwright.chromium.launch(**launch_options)
     if os.environ.get("VIDORAC_TEST_DEBUG_ONLY") != "1":
+        requested_viewports = {
+            item.strip()
+            for item in os.environ.get("VIDORAC_TEST_VIEWPORTS", "").split(",")
+            if item.strip()
+        }
         for viewport in VIEWPORTS:
-            print(run_viewport(browser, *viewport), flush=True)
+            if not requested_viewports or viewport[0] in requested_viewports:
+                print(run_viewport(browser, *viewport), flush=True)
     run_debug_failure_cases(browser)
     print({"debug_failure_cases": "passed"}, flush=True)
     browser.close()

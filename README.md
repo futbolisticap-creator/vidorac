@@ -1,6 +1,6 @@
 # Vidorac Public Beta
 
-Vidorac is a focused local web application for analyzing and downloading public media from YouTube, TikTok, Instagram, X/Twitter, Reddit, and Facebook. It connects a Next.js interface to FastAPI, uses yt-dlp for video/audio, gallery-dl for supported image posts, galleries, and mixed posts, and delegates safe merging and MP3 conversion to FFmpeg.
+Vidorac is a focused TikTok downloader for public videos, photo slideshows, and MP3 audio. It connects a Next.js interface to FastAPI, uses yt-dlp for video/audio, gallery-dl for TikTok photo posts, and delegates safe merging and MP3 conversion to FFmpeg.
 
 ## Project structure
 
@@ -21,15 +21,15 @@ The project directory may still be named `Clipora` locally while the product and
 - Python 3.10 or newer
 - FFmpeg and ffprobe available in `PATH` for merged video streams and MP3 conversion
 
-## Supported media
+## Public product support
 
-- YouTube, TikTok, Instagram, X/Twitter, Reddit, and Facebook videos through yt-dlp
-- Public Instagram, TikTok, X/Twitter, Reddit, and Facebook image posts through gallery-dl when the platform exposes them anonymously
-- Single images in their original format when supported
-- Image carousels with individual, selected, or complete ZIP downloads
-- Supported mixed posts with individual media or complete ZIP downloads
+- Public TikTok videos with real available quality choices
+- TikTok audio converted server-side to MP3 at 192 kbps when available
+- Public TikTok photo posts and slideshows with individual, selected, or complete ZIP downloads
 
-Only individual posts are accepted. Profiles, timelines, subreddits, feeds, hashtags, groups, albums, and account collections are rejected. Gallery downloads are limited to 50 items and 1 GB total. No cookies, private sessions, or login data are used.
+Only individual public TikTok posts are accepted by the website. Profiles, feeds, hashtags, private content, and login-dependent posts are rejected. Downloads are limited to 250 MB. No cookies, private sessions, or login data are used.
+
+The backend retains extractors for the previously supported platforms as a reusable shared core. Production restricts public access with `VIDORAC_PUBLIC_PLATFORMS=tiktok`; a future separate deployment can enable a different platform without duplicating extractor code.
 
 ## Run the frontend
 
@@ -59,7 +59,7 @@ The health endpoint is available at http://localhost:8000/api/health and returns
 {"status":"ok"}
 ```
 
-## Supported public media
+## Shared backend capabilities
 
 - YouTube, TikTok, Instagram, X/Twitter, Reddit, and Facebook video through yt-dlp
 - Instagram single-image, carousel, and mixed posts through gallery-dl when anonymously accessible
@@ -69,7 +69,7 @@ The health endpoint is available at http://localhost:8000/api/health and returns
 - Facebook public image posts, multi-image posts, and mixed posts when gallery-dl can access them without login
 - Mixed image/video post archives when gallery-dl exposes every item reliably
 
-Vidorac accepts individual post/video URLs only. Profiles, timelines, subreddits, feeds, hashtags, groups, albums, private content, and login-dependent posts are rejected. Galleries are limited to 50 items and 1 GB total, packaged with safe flat filenames, and use the same one-time native browser download and temporary-file cleanup flow as video.
+Vidorac accepts individual post/video URLs only. Profiles, timelines, subreddits, feeds, hashtags, groups, albums, private content, and login-dependent posts are rejected. Galleries are limited to 50 items and 250 MB total, packaged with safe flat filenames, and use the same one-time native browser download and temporary-file cleanup flow as video.
 
 Accepted URL families include X/Twitter status links; Reddit post, gallery, short, and direct-video links; and public Facebook post, photo, watch, video, Reel, shared-post, shared-video, or `fb.watch` links. Support still depends on the current public behavior of each platform and the installed extractors.
 
@@ -80,7 +80,7 @@ Vidorac checks ambiguous post URLs with gallery-dl so it can see every ordered i
 With both services running, submit a supported public URL in the Vidorac interface or call the API directly:
 
 ```powershell
-$body = @{ url = "https://www.youtube.com/watch?v=VIDEO_ID" } | ConvertTo-Json
+$body = @{ url = "https://www.tiktok.com/@creator/video/VIDEO_ID" } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/analyze" -ContentType "application/json" -Body $body
 ```
 
@@ -98,7 +98,7 @@ You can also test the endpoint from PowerShell:
 
 ```powershell
 $body = @{
-  url = "https://www.youtube.com/watch?v=VIDEO_ID"
+  url = "https://www.tiktok.com/@creator/video/VIDEO_ID"
   quality = "720"
 } | ConvertTo-Json
 
@@ -120,7 +120,7 @@ Prepared downloads expire after 15 minutes and are single-use. Expired, delivere
 ### Local safety limits
 
 - Maximum duration: 3 hours
-- Maximum download size: 1 GB
+- Maximum download size: 250 MB
 - Playlists, private content, authentication, cookies, DRM bypasses, and geographic bypasses are not supported
 
 The file-size limit is checked using yt-dlp metadata when available and while bytes are written. If a remote source does not report its size in advance, the download is stopped once the temporary data exceeds the limit.
@@ -195,7 +195,9 @@ Render uses:
 ```dotenv
 VIDORAC_ENV=production
 VIDORAC_ALLOWED_ORIGINS=https://<real-cloudflare-project>.pages.dev
-VIDORAC_MAX_CONCURRENT_JOBS=1
+VIDORAC_MAX_CONCURRENT_JOBS=2
+VIDORAC_PUBLIC_PLATFORMS=tiktok
+VIDORAC_PREPARATION_RATE_LIMIT=12
 ```
 
 `VIDORAC_ALLOWED_ORIGINS` accepts a comma-separated list of exact HTTP(S) origins when both a Pages URL and a future custom domain are required. Wildcards, credentials, paths, queries, and fragments are rejected. If the variable is absent locally, only `http://localhost:3000` and `http://127.0.0.1:3000` are allowed.
@@ -229,7 +231,8 @@ Because `NEXT_PUBLIC_*` values are embedded at build time, changing the Render U
 - Render may put the service to sleep. The first analysis after inactivity can take longer while it wakes; the existing loading state remains visible and the frontend does not impose a short artificial timeout.
 - During that cold start, Analyze changes from its normal loading state to **Starting Vidorac…** after 3 seconds, **Almost ready…** after 15 seconds, and a longer-wait message after 45 seconds. Production requests time out after 120 seconds and can be retried with the same URL without reloading the page. Any real HTTP response cancels these waiting states immediately so platform errors are only classified from an actual backend response.
 - Prepared downloads and uploads use isolated operating-system temporary directories. Files are removed after delivery, on failure, when their 15-minute registry entry expires during registry activity, and on a normal shutdown. Render's ephemeral filesystem is appropriate and no persistent disk, database, or Redis is required.
-- `VIDORAC_MAX_CONCURRENT_JOBS=1` serializes download preparation and video processing in production, so multiple FFmpeg jobs cannot run simultaneously on the free instance. URL analysis remains responsive and local development defaults to two job slots.
+- `VIDORAC_MAX_CONCURRENT_JOBS=2` bounds heavy preparation and FFmpeg work without serializing lightweight analysis.
+- `VIDORAC_PREPARATION_RATE_LIMIT=12` allows twelve preparation requests per client in a rolling ten-minute window; it is enforced in the backend rather than relying on the browser.
 - A forced container termination can interrupt cleanup, but Render discards the service's ephemeral filesystem when the instance is replaced. There is no durable storage growth across instances.
 
 ### Pre-deployment checks
@@ -249,4 +252,4 @@ npm run build
 Test-Path .\out\index.html
 ```
 
-The final command must return `True`. Docker Desktop can validate the production container locally with `docker build --tag vidorac-backend:local .` from the `backend` directory, followed by a container run that supplies `PORT`, `VIDORAC_ENV`, `VIDORAC_ALLOWED_ORIGINS`, and `VIDORAC_MAX_CONCURRENT_JOBS`.
+The final command must return `True`. Docker Desktop can validate the production container locally with `docker build --tag vidorac-backend:local .` from the `backend` directory, followed by a container run that supplies `PORT`, `VIDORAC_ENV`, `VIDORAC_ALLOWED_ORIGINS`, `VIDORAC_MAX_CONCURRENT_JOBS`, `VIDORAC_PUBLIC_PLATFORMS`, and `VIDORAC_PREPARATION_RATE_LIMIT`.

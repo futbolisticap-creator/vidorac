@@ -63,7 +63,13 @@ from .media_gallery import (
     GalleryTooManyItemsError,
     download_gallery_post,
 )
-from .runtime_config import allowed_origins_from_env, max_concurrent_jobs_from_env
+from .rate_limit import SlidingWindowRateLimiter, request_client_key
+from .runtime_config import (
+    allowed_origins_from_env,
+    max_concurrent_jobs_from_env,
+    preparation_rate_limit_from_env,
+    public_platforms_from_env,
+)
 from .tools.compressor import compress_video, parse_compression_quality
 from .tools.converter import convert_video, parse_conversion_format
 from .tools.errors import (
@@ -98,6 +104,11 @@ DEVELOPMENT_MODE = os.getenv("VIDORAC_ENV", os.getenv("CLIPORA_ENV", "developmen
 ALLOWED_ORIGINS = allowed_origins_from_env()
 HEAVY_JOB_LIMIT = max_concurrent_jobs_from_env()
 heavy_job_slots = threading.BoundedSemaphore(HEAVY_JOB_LIMIT)
+PUBLIC_PLATFORMS = public_platforms_from_env()
+preparation_rate_limiter = SlidingWindowRateLimiter(
+    preparation_rate_limit_from_env(),
+    10 * 60,
+)
 
 
 def run_heavy_job(function, *args, **kwargs):
@@ -181,6 +192,12 @@ async def health_check() -> dict[str, str]:
 @app.post("/api/analyze", response_model=None)
 async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
     try:
+        _validated_url, platform = validate_and_classify_url(request.url)
+        if platform not in PUBLIC_PLATFORMS:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "detail": "TikTok links only. Vidorac currently supports TikTok links on this website."},
+            )
         media = await asyncio.to_thread(analyze_content, request.url)
     except InvalidUrlError:
         return JSONResponse(
@@ -197,7 +214,7 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
             status_code=400,
             content={
                 "success": False,
-                "detail": "Unsupported URL. Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.",
+                "detail": "Unsupported URL. Vidorac currently supports TikTok links on this website.",
             },
         )
     except GalleryTooManyItemsError:
@@ -303,7 +320,7 @@ def download_error_response(error: Exception, *, platform: str | None = None) ->
             status_code=400,
             content={
                 "success": False,
-                "detail": "Unsupported URL. Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.",
+                "detail": "Unsupported URL. Vidorac currently supports TikTok links on this website.",
             },
         )
     if isinstance(error, FFmpegRequiredError):
@@ -379,7 +396,7 @@ def download_error_response(error: Exception, *, platform: str | None = None) ->
     if isinstance(error, FileSizeLimitError):
         return JSONResponse(
             status_code=413,
-            content={"success": False, "detail": "This download exceeds Vidorac's 1 GB limit."},
+            content={"success": False, "detail": "This file is too large for the current Vidorac Beta limits."},
         )
     if isinstance(error, GalleryTooManyItemsError):
         return JSONResponse(
@@ -504,10 +521,23 @@ def parse_seconds(value: str) -> float:
 
 
 @app.post("/api/download/prepare", response_model=None)
-async def prepare_download(request: DownloadRequest) -> dict[str, object] | JSONResponse:
+async def prepare_download(
+    request: DownloadRequest,
+    http_request: Request,
+) -> dict[str, object] | JSONResponse:
     platform: str | None = None
+    if not preparation_rate_limiter.allow(request_client_key(http_request)):
+        return JSONResponse(
+            status_code=429,
+            content={"success": False, "detail": "Too many download requests. Please wait a few minutes and try again."},
+        )
     try:
         _validated_url, platform = validate_and_classify_url(request.url)
+        if platform not in PUBLIC_PLATFORMS:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "detail": "TikTok links only. Vidorac currently supports TikTok links on this website."},
+            )
         if request.quality is None:
             artifact = await asyncio.to_thread(
                 run_heavy_job,

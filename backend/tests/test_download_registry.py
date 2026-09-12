@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from fastapi import Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.download_registry import (
@@ -36,6 +37,10 @@ def make_artifact(filename: str = "Vidorac test.mp4") -> DownloadArtifact:
         media_type="video/mp4",
         temp_directory=temp_directory,
     )
+
+
+def make_http_request() -> Request:
+    return Request({"type": "http", "method": "POST", "path": "/api/download/prepare", "headers": [], "client": ("127.0.0.1", 12345)})
 
 
 class PreparedDownloadRegistryTests(unittest.TestCase):
@@ -116,7 +121,7 @@ class DownloadEndpointTests(unittest.TestCase):
         artifact = make_artifact("Safe title.mp4")
         with patch("app.main.download_media", return_value=artifact):
             response = asyncio.run(
-                prepare_download(DownloadRequest(url="https://youtu.be/test", quality="720"))
+                prepare_download(DownloadRequest(url="https://youtu.be/test", quality="720"), make_http_request())
             )
 
         self.assertTrue(response["success"])
@@ -134,7 +139,8 @@ class DownloadEndpointTests(unittest.TestCase):
                         url="https://www.instagram.com/p/ABC123/",
                         item_indices=[0, 2],
                         archive=True,
-                    )
+                    ),
+                    make_http_request(),
                 )
             )
 
@@ -147,8 +153,8 @@ class DownloadEndpointTests(unittest.TestCase):
 
     def test_preparing_again_creates_a_new_download_id(self) -> None:
         with patch("app.main.download_media", side_effect=[make_artifact("first.mp4"), make_artifact("second.mp4")]):
-            first = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best")))
-            second = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best")))
+            first = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best"), make_http_request()))
+            second = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best"), make_http_request()))
 
         self.assertNotEqual(first["download_id"], second["download_id"])
 

@@ -4,7 +4,7 @@ import { informationMetadata } from "../seo";
 
 export const metadata = informationMetadata({
   title: "Terms of Use | Vidorac",
-  description: "Read the terms that apply when using Vidorac to process publicly accessible media from supported platforms.",
+  description: "Read the terms that apply when using Vidorac to process publicly accessible TikTok media.",
   slug: "terms",
 });
 
@@ -19,7 +19,7 @@ export default function TermsPage() {
 
       <section>
         <h2>Service</h2>
-        <p>Vidorac is a public beta tool for processing publicly accessible media from supported platforms.</p>
+        <p>Vidorac is a public beta tool for processing publicly accessible TikTok videos, photo slideshows and audio.</p>
       </section>
 
       <section>
@@ -39,12 +39,12 @@ export default function TermsPage() {
 
       <section>
         <h2>Third-party platforms</h2>
-        <p>Vidorac is not affiliated with YouTube, TikTok, Instagram, X, Reddit or Facebook. Their trademarks belong to their respective owners, and use of those platforms remains subject to their applicable terms.</p>
+        <p>Vidorac is not affiliated with TikTok or ByteDance. Their trademarks belong to their respective owners, and use of TikTok remains subject to its applicable terms.</p>
       </section>
 
       <section>
         <h2>Availability</h2>
-        <p>Vidorac is currently a beta service. Availability is not guaranteed, and platform changes may temporarily affect supported sites, formats or qualities. The service may be changed, interrupted or unavailable while improvements are made.</p>
+        <p>Vidorac is currently a beta service. Availability is not guaranteed, and TikTok changes may temporarily affect supported formats or qualities. The service may be changed, interrupted or unavailable while improvements are made.</p>
       </section>
 
       <section>

@@ -18,10 +18,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Vidorac Beta — Video, Image & Carousel Downloader",
+    default: "Vidorac — TikTok Video, Slideshow & MP3 Downloader",
     template: "%s — Vidorac",
   },
-  description: "Download public videos, images and carousels from supported platforms with Vidorac.",
+  description: "Download public TikTok videos, photo slideshows and audio as MP3 with Vidorac. Fast, simple and no sign-up required.",
   applicationName: "Vidorac",
   alternates: { canonical: "/" },
   verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim()
@@ -32,8 +32,8 @@ export const metadata: Metadata = {
     shortcut: "/branding/vidorac-icon.svg",
   },
   openGraph: {
-    title: "Vidorac Beta — Video, Image & Carousel Downloader",
-    description: "Download public videos, images and carousels from supported platforms with Vidorac.",
+    title: "Vidorac — TikTok Video, Slideshow & MP3 Downloader",
+    description: "Download public TikTok videos, photo slideshows and audio as MP3 with Vidorac. Fast, simple and no sign-up required.",
     url: "/",
     siteName: "Vidorac",
     type: "website",
@@ -41,8 +41,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vidorac Beta — Video, Image & Carousel Downloader",
-    description: "Download public videos, images and carousels from supported platforms with Vidorac.",
+    title: "Vidorac — TikTok Video, Slideshow & MP3 Downloader",
+    description: "Download public TikTok videos, photo slideshows and audio as MP3 with Vidorac. Fast, simple and no sign-up required.",
     images: [OG_IMAGE_PATH],
   },
 };

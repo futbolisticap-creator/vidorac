@@ -23,7 +23,7 @@ from .format_presets import infer_output_container, select_streams
 logger = logging.getLogger("clipora.downloader")
 
 MAX_DURATION_SECONDS = 3 * 60 * 60
-MAX_FILESIZE_BYTES = 1024 * 1024 * 1024
+MAX_FILESIZE_BYTES = 250 * 1024 * 1024
 MAX_FILENAME_LENGTH = 120
 WINDOWS_RESERVED_NAMES = {
     "CON",
@@ -334,9 +334,16 @@ def download_media(raw_url: str, quality: DownloadQuality) -> DownloadArtifact:
             raise FileSizeLimitError
 
         extension = output_path.suffix.lower().lstrip(".") or ("mp3" if quality is DownloadQuality.MP3 else "mp4")
+        if quality is DownloadQuality.MP3:
+            uploader = info.get("uploader") or info.get("creator")
+            title = info.get("title")
+            download_title = " - ".join(part.strip() for part in (uploader, title) if isinstance(part, str) and part.strip())
+            download_title = download_title or "vidorac-tiktok-audio"
+        else:
+            download_title = info.get("title")
         return DownloadArtifact(
             path=output_path,
-            download_name=safe_download_name(info.get("title"), extension),
+            download_name=safe_download_name(download_title, extension),
             media_type=_media_type_for(output_path),
             temp_directory=temp_directory,
         )

@@ -12,13 +12,15 @@ export default function SiteFooter() {
               <Image src="/branding/vidorac-logo.svg" alt="Vidorac" width={124} height={32} className="footer-brand-logo" />
               <span className="footer-beta">Public Beta</span>
             </div>
-            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">A simple way to save public videos, images and carousels.</p>
+            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">TikTok video, slideshow and MP3 downloads in one focused tool.</p>
           </div>
           <nav aria-label="Footer navigation" className="footer-links">
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/#supported-sites">Supported sites</Link>
+            <Link href="/tiktok-downloader">TikTok Downloader</Link>
+            <Link href="/tiktok-mp3-downloader">TikTok MP3</Link>
+            <Link href="/tiktok-slideshow-downloader">TikTok Slideshow</Link>
             <SupportButton label="Donate" variant="footer" />
           </nav>
         </div>
@@ -26,7 +28,7 @@ export default function SiteFooter() {
           <p>© {new Date().getFullYear()} Vidorac</p>
           <p>Only download content you own or have permission to use.</p>
         </div>
-        <p className="footer-legal">Vidorac is not affiliated with YouTube, TikTok, Instagram, X, Reddit or Facebook. Trademarks belong to their respective owners. Users are responsible for ensuring they have permission to download and use content.</p>
+        <p className="footer-legal">Vidorac is not affiliated with TikTok or ByteDance. Their trademarks belong to their respective owners. Users are responsible for ensuring they have permission to download and use content.</p>
       </div>
     </footer>
   );

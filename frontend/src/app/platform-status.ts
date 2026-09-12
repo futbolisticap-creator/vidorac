@@ -11,9 +11,7 @@ type PlatformStatus = {
 export type AnalyzerUrlDecision =
   | { action: "analyze"; platform: PlatformId }
   | { action: "invalid" }
-  | { action: "unsupported" }
-  | { action: "platform_unavailable"; platform: PlatformId }
-  | { action: "instagram_posts_unavailable"; platform: "instagram" };
+  | { action: "tiktok_only"; platform: PlatformId | null };
 export type DiagnosticUrlContext = { platform: PlatformId | "unknown"; type: "reel" | "post" | "other" | "invalid" };
 
 export const platformStatus: Record<PlatformId, PlatformStatus> = {
@@ -108,15 +106,7 @@ export function getAnalyzerUrlDecision(value: string): AnalyzerUrlDecision {
   if (!parsed || (parsed.port && !["80", "443"].includes(parsed.port))) return { action: "invalid" };
 
   const platform = detectPlatform(parsed);
-  if (!platform) return { action: "unsupported" };
-  if (
-    platform === "instagram"
-    && !isCapabilityEnabled("instagram", "posts")
-    && /^\/p\/[^/]+\/?$/.test(parsed.pathname)
-  ) {
-    return { action: "instagram_posts_unavailable", platform };
-  }
-  if (!isPlatformEnabled(platform)) return { action: "platform_unavailable", platform };
+  if (platform !== "tiktok") return { action: "tiktok_only", platform };
   return { action: "analyze", platform };
 }
 
@@ -129,8 +119,4 @@ export function describeUrlForDiagnostics(value: string): DiagnosticUrlContext {
   if (firstSegment === "reel" || firstSegment === "reels") return { platform, type: "reel" };
   if (firstSegment === "p") return { platform, type: "post" };
   return { platform, type: "other" };
-}
-
-export function isInstagramPostCapabilityDisabled(value: string): boolean {
-  return getAnalyzerUrlDecision(value).action === "instagram_posts_unavailable";
 }

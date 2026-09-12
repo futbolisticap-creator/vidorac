@@ -6,6 +6,9 @@ LOCAL_FRONTEND_ORIGINS = (
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 )
+SUPPORTED_PUBLIC_PLATFORMS = frozenset(
+    {"youtube", "tiktok", "instagram", "x", "reddit", "facebook"}
+)
 
 
 def allowed_origins_from_env(value: str | None = None) -> list[str]:
@@ -47,4 +50,25 @@ def max_concurrent_jobs_from_env(value: str | None = None) -> int:
         raise ValueError("VIDORAC_MAX_CONCURRENT_JOBS must be an integer") from exc
     if not 1 <= limit <= 8:
         raise ValueError("VIDORAC_MAX_CONCURRENT_JOBS must be between 1 and 8")
+    return limit
+
+
+def public_platforms_from_env(value: str | None = None) -> frozenset[str]:
+    raw_value = os.getenv("VIDORAC_PUBLIC_PLATFORMS") if value is None else value
+    if not raw_value or not raw_value.strip():
+        return SUPPORTED_PUBLIC_PLATFORMS
+    platforms = frozenset(item.strip().lower() for item in raw_value.split(",") if item.strip())
+    if not platforms or not platforms.issubset(SUPPORTED_PUBLIC_PLATFORMS):
+        raise ValueError("VIDORAC_PUBLIC_PLATFORMS contains an unsupported platform")
+    return platforms
+
+
+def preparation_rate_limit_from_env(value: str | None = None) -> int:
+    raw_value = os.getenv("VIDORAC_PREPARATION_RATE_LIMIT", "12") if value is None else value
+    try:
+        limit = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("VIDORAC_PREPARATION_RATE_LIMIT must be an integer") from exc
+    if not 1 <= limit <= 120:
+        raise ValueError("VIDORAC_PREPARATION_RATE_LIMIT must be between 1 and 120")
     return limit

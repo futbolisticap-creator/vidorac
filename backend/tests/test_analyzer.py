@@ -302,6 +302,19 @@ class UrlValidationTests(unittest.TestCase):
 
 
 class AnalyzeEndpointErrorTests(unittest.TestCase):
+    def test_tiktok_only_deployment_rejects_other_platform_before_extraction(self) -> None:
+        from app.main import AnalyzeRequest, analyze
+
+        with (
+            patch("app.main.PUBLIC_PLATFORMS", frozenset({"tiktok"})),
+            patch("app.main.analyze_content") as extractor,
+        ):
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.youtube.com/watch?v=test")))
+        payload = json.loads(response.body)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("TikTok links only", payload["detail"])
+        extractor.assert_not_called()
+
     def test_instagram_post_restriction_is_useful_and_not_misclassified_as_private(self) -> None:
         from app.main import AnalyzeRequest, analyze
         from app.media_gallery import InstagramPostTemporarilyUnavailableError
@@ -412,7 +425,7 @@ class MetadataTests(unittest.TestCase):
         best = next(option for option in options if option["id"] == "best")
         self.assertIsNone(best["estimated_size_bytes"])
 
-    def test_estimated_downloads_over_one_gigabyte_are_unavailable(self) -> None:
+    def test_estimated_downloads_over_beta_limit_are_unavailable(self) -> None:
         options = build_quality_options(
             {
                 "duration": 600,
@@ -422,7 +435,7 @@ class MetadataTests(unittest.TestCase):
                         "vcodec": "avc1",
                         "acodec": "mp4a",
                         "ext": "mp4",
-                        "filesize": 2 * 1024 * 1024 * 1024,
+                        "filesize": 300 * 1024 * 1024,
                     }
                 ],
             }
@@ -562,7 +575,7 @@ class MetadataTests(unittest.TestCase):
         with patch("app.analyzer.shutil.which", return_value="ffmpeg"):
             best = next(option for option in build_quality_options(info) if option["id"] == "best")
 
-        self.assertGreater(best["estimated_size_bytes"], 1024 * 1024 * 1024)
+        self.assertGreater(best["estimated_size_bytes"], 250 * 1024 * 1024)
         self.assertTrue(best["available"])
 
 

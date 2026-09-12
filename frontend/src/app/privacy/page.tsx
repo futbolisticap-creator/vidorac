@@ -55,7 +55,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>External platforms</h2>
-        <p>Vidorac processes public URLs from supported external platforms, including YouTube, TikTok, Instagram, X, Reddit and Facebook. Vidorac is not affiliated with these platforms, and their own terms and privacy policies continue to apply.</p>
+        <p>Vidorac processes public TikTok URLs to analyze available videos, photo slideshows and audio. Vidorac is not affiliated with TikTok or ByteDance, and their own terms and privacy policies continue to apply.</p>
       </section>
 
       <section>

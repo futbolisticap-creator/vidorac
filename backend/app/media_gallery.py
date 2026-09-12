@@ -29,7 +29,7 @@ from .downloader import DownloadArtifact, safe_download_name
 logger = logging.getLogger("clipora.gallery")
 
 MAX_GALLERY_ITEMS = 50
-MAX_GALLERY_SIZE_BYTES = 1024 * 1024 * 1024
+MAX_GALLERY_SIZE_BYTES = 250 * 1024 * 1024
 MAX_REDIRECTS = 5
 GALLERY_ANALYSIS_TIMEOUT_SECONDS = 20
 GALLERY_PROCESS_SHUTDOWN_SECONDS = 2

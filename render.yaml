@@ -12,6 +12,10 @@ services:
       - key: VIDORAC_ENV
         value: production
       - key: VIDORAC_MAX_CONCURRENT_JOBS
-        value: "1"
+        value: "2"
+      - key: VIDORAC_PUBLIC_PLATFORMS
+        value: tiktok
+      - key: VIDORAC_PREPARATION_RATE_LIMIT
+        value: "12"
       - key: VIDORAC_ALLOWED_ORIGINS
         sync: false

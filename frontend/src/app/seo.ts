@@ -4,12 +4,9 @@ export const SITE_URL = "https://vidorac.pages.dev";
 export const OG_IMAGE_PATH = "/branding/vidorac-og.png";
 
 export type PlatformSlug =
-  | "youtube-downloader"
   | "tiktok-downloader"
-  | "instagram-downloader"
-  | "x-downloader"
-  | "reddit-downloader"
-  | "facebook-downloader";
+  | "tiktok-mp3-downloader"
+  | "tiktok-slideshow-downloader";
 
 export type InformationSlug = "contact" | "privacy" | "terms";
 
@@ -18,12 +15,9 @@ export const platformLinks: Array<{
   name: string;
   media: string;
 }> = [
-  { slug: "youtube-downloader", name: "YouTube", media: "Videos & audio" },
-  { slug: "tiktok-downloader", name: "TikTok", media: "Videos & slideshows" },
-  { slug: "instagram-downloader", name: "Instagram", media: "Reels" },
-  { slug: "x-downloader", name: "X", media: "Public videos" },
-  { slug: "reddit-downloader", name: "Reddit", media: "Public videos" },
-  { slug: "facebook-downloader", name: "Facebook", media: "Public videos" },
+  { slug: "tiktok-downloader", name: "TikTok Downloader", media: "Videos, slideshows & MP3" },
+  { slug: "tiktok-mp3-downloader", name: "TikTok MP3", media: "Audio extraction" },
+  { slug: "tiktok-slideshow-downloader", name: "TikTok Slideshow", media: "Photo posts" },
 ];
 
 export function platformMetadata({

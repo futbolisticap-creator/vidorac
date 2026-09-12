@@ -3,7 +3,6 @@
 /* eslint-disable @next/next/no-img-element -- public preview hosts are dynamic extractor metadata */
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import AdPlaceholder from "./ad-placeholder";
 import { API_BASE_URL } from "./api-config";
 import {
   CLIPBOARD_UNAVAILABLE_MESSAGE,
@@ -14,12 +13,9 @@ import {
   type QualityOption,
 } from "./analyzer-client";
 import { useAnalyzerDiagnostics } from "./analyzer-diagnostics";
-import PlatformAvailabilityNotice from "./platform-availability-notice";
 import {
   describeUrlForDiagnostics,
-  detectPlatformFromUrl,
   getAnalyzerUrlDecision,
-  type PlatformId,
 } from "./platform-status";
 import { SupportCard } from "./support-button";
 
@@ -65,28 +61,24 @@ function formatEstimatedSize(bytes: number | null): string | null {
 }
 
 function publicAnalyzeError(detail?: string): string {
-  if (detail === "Invalid URL.") return "Please paste a valid URL.";
-  if (detail?.startsWith("Instagram photo and carousel posts are temporarily unavailable")) return detail;
-  if (detail?.startsWith("Instagram is taking too long")) return detail;
+  if (detail === "Invalid URL.") return "Invalid TikTok link.";
   if (detail?.startsWith("TikTok temporarily") || detail?.startsWith("This TikTok")) return detail;
-  if (detail?.startsWith("YouTube ")) return detail;
-  if (detail?.startsWith("Unsupported URL.")) return "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.";
-  if (detail?.includes("individual posts")) return "Paste a link to one individual post, not a profile or feed.";
+  if (detail?.startsWith("Unsupported URL.")) return "Vidorac currently supports TikTok links on this website.";
+  if (detail?.includes("individual posts")) return "Paste a link to one public TikTok video or slideshow, not a profile or feed.";
   if (detail?.includes("too many")) return "This post contains too many files.";
-  if (detail?.includes("authentication")) return "This post requires authentication and isn't publicly accessible.";
-  return "We couldn't analyze this post. It may be private, removed, or temporarily unavailable.";
+  if (detail?.includes("authentication")) return "This TikTok isn't publicly accessible.";
+  return "This TikTok could not be accessed. It may be private, removed, or temporarily unavailable.";
 }
 
 function publicDownloadError(detail?: string): string {
   if (!detail) return "We couldn't prepare this download. Please try again.";
-  if (detail.startsWith("Instagram photo and carousel posts are temporarily unavailable")) return detail;
   if (detail.startsWith("TikTok temporarily") || detail.startsWith("This TikTok")) return detail;
-  if (detail.includes("temporarily")) return "The source temporarily rejected the request. Please try again later.";
-  if (detail.includes("authentication")) return "This post requires authentication and isn't publicly accessible.";
+  if (detail.includes("temporarily")) return "TikTok temporarily rejected the request. Please try again later.";
+  if (detail.includes("authentication")) return "This TikTok isn't publicly accessible.";
   if (detail.includes("selected media")) return "That item is no longer available in this post. Analyze it again.";
   if (detail.includes("not available")) return "This media is no longer available.";
   if (detail.includes("format")) return "This format is not available for this video.";
-  if (detail.includes("1 GB") || detail.includes("too large")) return "This download exceeds Vidorac's 1 GB limit.";
+  if (detail.includes("250 MB") || detail.includes("too large")) return "This file is too large for the current Vidorac Beta limits.";
   if (detail.includes("3-hour")) return "This video is longer than Vidorac's 3-hour limit.";
   if (detail.includes("FFmpeg")) return "Vidorac needs FFmpeg to prepare this format.";
   return "We couldn't prepare this download. Please try again.";
@@ -125,7 +117,6 @@ export default function Analyzer() {
   const [failedPreviews, setFailedPreviews] = useState<Set<number>>(new Set());
   const [analysisWaitState, setAnalysisWaitState] = useState<AnalysisWaitState>("idle");
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
-  const [unavailablePlatform, setUnavailablePlatform] = useState<PlatformId | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const analysisTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -164,7 +155,6 @@ export default function Analyzer() {
     let didTimeout = false;
 
     setIsAnalyzing(true);
-    setUnavailablePlatform(null);
     setAnalysisWaitState("analyzing");
     setRetryUrl(requestedUrl);
     setError(null);
@@ -262,45 +252,15 @@ export default function Analyzer() {
     event.preventDefault();
     diagnostics.resetAttempt();
     diagnostics.setStage("url-parsing");
-    setUnavailablePlatform(null);
     const decision = getAnalyzerUrlDecision(url);
     diagnostics.setStage("platform-detection");
     const urlContext = describeUrlForDiagnostics(url);
     diagnostics.setUrlContext(urlContext.platform, urlContext.type);
     diagnostics.setStage("capability-check");
-    if (decision.action === "invalid" || decision.action === "unsupported") {
+    if (decision.action === "invalid" || decision.action === "tiktok_only") {
       setMedia(null);
-      setError(decision.action === "invalid" ? "Please paste a valid URL." : "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.");
-      return;
-    }
-    if (decision.action === "instagram_posts_unavailable") {
-      analysisRequestId.current += 1;
-      analysisController.current?.abort();
-      clearAnalysisTimers();
-      setIsAnalyzing(false);
-      setAnalysisWaitState("idle");
-      setUnavailablePlatform(null);
-      setError("Instagram photo and carousel posts are temporarily unavailable. Instagram is currently restricting anonymous access to some public posts. Reels are still supported.");
+      setError(decision.action === "invalid" ? "Invalid TikTok link." : "TikTok links only — Vidorac currently supports TikTok links on this website.");
       setTechnicalError(null);
-      setMedia(null);
-      setAnalyzedUrl(null);
-      setDownloadError(null);
-      setLastDownload(null);
-      setSelectedItems(new Set());
-      setDownloadPhases({});
-      setRetryUrl(null);
-      return;
-    }
-    if (decision.action === "platform_unavailable") {
-      analysisRequestId.current += 1;
-      analysisController.current?.abort();
-      clearAnalysisTimers();
-      setIsAnalyzing(false);
-      setAnalysisWaitState("idle");
-      setUnavailablePlatform(decision.platform);
-      setError(null);
-      setTechnicalError(null);
-      setMedia(null);
       setAnalyzedUrl(null);
       setDownloadError(null);
       setLastDownload(null);
@@ -415,7 +375,7 @@ export default function Analyzer() {
     analysisRequestId.current += 1;
     analysisController.current?.abort();
     analysisController.current = null;
-    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setUnavailablePlatform(null); setIsAnalyzing(false);
+    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setIsAnalyzing(false);
     const focusInput = () => inputRef.current?.focus();
     if (typeof window === "undefined") focusInput();
     else window.requestAnimationFrame(focusInput);
@@ -423,27 +383,24 @@ export default function Analyzer() {
 
   const isVideo = media?.media_type === "video";
   const gallery = media && media.media_type !== "video" ? media : null;
+  const videoQualities = isVideo ? media.quality_options.filter((quality) => quality.id !== "mp3") : [];
+  const mp3Quality = isVideo ? media.quality_options.find((quality) => quality.id === "mp3" && quality.available) : undefined;
   const anyPreparing = Object.values(downloadPhases).includes("preparing");
   const metadata = media ? isVideo ? [displayPlatform(media.platform), formatDuration(media.duration), media.max_height ? `${media.max_height}p max` : null].filter(Boolean) : [displayPlatform(media.platform), media.media_type === "image" ? "1 image" : `${media.item_count} ${media.media_type === "gallery" ? "images" : "media items"}`] : [];
-  const timedOutPlatform = retryUrl ? detectPlatformFromUrl(retryUrl) : null;
-  const instagramPostUnavailable = error?.startsWith("Instagram photo and carousel posts are temporarily unavailable") ?? false;
   const waitCopy = analysisWaitState === "starting"
-    ? { title: "Analyzing your link…", text: "Checking the public post and its available media." }
+    ? { title: "Analyzing TikTok…", text: "Checking the public post and its available video, images and audio." }
     : analysisWaitState === "taking-longer"
-      ? { title: "This is taking longer than usual…", text: "The source platform may be responding slowly. Please keep this tab open." }
+      ? { title: "Processing your TikTok link…", text: "TikTok may be responding slowly. Please keep this tab open." }
       : analysisWaitState === "timed-out"
-        ? {
-            title: timedOutPlatform === "instagram" ? "Instagram is taking too long to respond." : "The source platform is taking too long to respond.",
-            text: timedOutPlatform === "instagram" ? "Please try again in a moment or try another public post." : "Please try again in a moment.",
-          }
+        ? { title: "TikTok is taking too long to respond.", text: "Please try again in a moment." }
         : null;
 
   return (
     <div className="downloader-shell mt-8 w-full max-w-5xl text-left">
       <form onSubmit={handleSubmit} noValidate className="mx-auto max-w-4xl">
         <div className={`analyzer-form rounded-xl border bg-[var(--surface)] p-2 sm:flex sm:min-h-[4.25rem] sm:items-center sm:gap-2 ${error ? "border-red-400/30" : "border-[var(--border)]"}`}>
-          <label htmlFor="media-url" className="sr-only">Public media URL</label>
-          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Paste a video or post URL" className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label="Paste URL from clipboard">Paste</button></div>
+          <label htmlFor="media-url" className="sr-only">Public TikTok URL</label>
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Paste a TikTok link..." className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label="Paste TikTok URL from clipboard">Paste</button></div>
           <button type="submit" disabled={isAnalyzing} className="analyze-button flex w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--blue)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--blue-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 sm:min-h-[3.25rem] sm:w-auto">{isAnalyzing ? <span aria-hidden="true" className="analysis-wait-spinner !m-0 !size-[1.1rem] !border-white/25 !border-t-white" /> : <SearchIcon />}{isAnalyzing ? "Analyzing..." : "Analyze"}</button>
         </div>
         <div aria-live="polite" aria-atomic="true">
@@ -452,19 +409,7 @@ export default function Analyzer() {
             <div><h2>{waitCopy.title}</h2><p>{waitCopy.text}</p></div>
             {analysisWaitState === "timed-out" && <button type="button" onClick={retryAnalysis} className="analysis-retry-button">Try again</button>}
           </div>}
-          {instagramPostUnavailable ? (
-            <div id="analyze-error" className="analysis-wait-card" role="alert">
-              <div>
-                <h2>Instagram photo posts are temporarily unavailable</h2>
-                <p>Instagram is currently restricting anonymous access to some photo and carousel posts. Instagram Reels are still supported.</p>
-              </div>
-              <button type="button" onClick={clearAnalyzer} className="analysis-retry-button">Try another link</button>
-            </div>
-          ) : error ? <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p> : null}
-          {error?.startsWith("Instagram is taking too long") && retryUrl && (
-            <button type="button" onClick={retryAnalysis} className="analysis-retry-button mt-3">Try again</button>
-          )}
-          {unavailablePlatform && <PlatformAvailabilityNotice platform={unavailablePlatform} />}
+          {error ? <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p> : null}
           {IS_DEVELOPMENT && technicalError && error && <button type="button" onClick={copyTechnicalError} className="ml-2 mt-2 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65">{copiedError ? "Copied" : "Copy technical error"}</button>}
         </div>
       </form>
@@ -476,14 +421,14 @@ export default function Analyzer() {
         </div>
 
         <div className="mt-4 border-t border-white/[0.07] px-1 pb-1 pt-4">
-          {isVideo ? <><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-semibold text-white/85">Choose quality</h3><span className="text-xs text-[#65bfff]/65">Original quality or compatible MP4</span></div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">{media.quality_options.map((quality, index) => {
+          {isVideo ? <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(15rem,1fr)]"><section aria-labelledby="video-downloads-title" className="rounded-xl border border-white/[0.07] bg-white/[0.018] p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="section-label !text-[0.66rem]">Video</p><h3 id="video-downloads-title" className="mt-1 text-sm font-semibold text-white/85">Download video</h3></div><span className="text-xs text-[#65bfff]/65">Real available qualities</span></div><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{videoQualities.map((quality, index) => {
             const key = `quality:${quality.id}`;
             const phase = downloadPhases[key];
             const size = formatEstimatedSize(quality.estimated_size_bytes);
-            const details = quality.available ? quality.id === "mp3" ? ["MP3", "192 kbps", size].filter(Boolean) : [quality.id === "best" ? "Highest quality" : quality.id === "compatible" ? "Most compatible" : null, quality.resolution, quality.container, quality.video_codec, size].filter(Boolean) : ["Unavailable"];
+            const details = quality.available ? [quality.id === "best" ? "Highest quality" : quality.id === "compatible" ? "Most compatible" : null, quality.resolution, quality.container, quality.video_codec, size].filter(Boolean) : ["Unavailable"];
             return <button key={quality.id} type="button" disabled={phase === "preparing" || !quality.available} onClick={() => handleQuality(quality.id)} title={!quality.available ? `${quality.label} is not available for this video` : undefined} className={`flex min-h-16 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-not-allowed ${phase ? "border-[#34a5ff]/40 bg-[#1682ff]/20 text-[#9bdcff]" : index < 2 ? "border-[#2389ff]/30 bg-[#1682ff]/10 text-[#84ceff] hover:border-[#45a6ff]/50 hover:bg-[#1682ff]/15 disabled:opacity-40" : "border-white/[0.09] bg-white/[0.035] text-white/65 hover:border-white/20 hover:bg-white/[0.07] disabled:opacity-35"}`}>{phase === "preparing" && <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-[#88d5ff]/25 border-t-[#88d5ff]" />}<span className="flex min-w-0 flex-col gap-0.5"><span>{phase === "preparing" ? "Preparing..." : phase === "ready" ? "Download ready" : phase === "started" ? "Download started" : quality.label}</span>{!phase && <span className="truncate text-xs font-normal text-white/35">{details.join(" · ")}</span>}</span></button>;
-          })}</div></> : gallery?.media_type === "image" ? <button type="button" disabled={downloadPhases.all === "preparing"} onClick={handleAll} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(20,120,255,0.2)] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70 sm:w-auto">{downloadPhases.all === "preparing" && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{downloadPhases.all === "preparing" ? "Preparing..." : downloadPhases.all === "ready" ? "Download ready" : downloadPhases.all === "started" ? "Download started" : "Download Image"}</button> : gallery ? <>
-            <div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-sm font-semibold text-white/90">{gallery.media_type === "mixed" ? "Media in this post" : "Images in this post"}</h3><p className="mt-1 text-xs text-white/40">Download one item, select several, or get the complete post.</p></div>{selectedItems.size > 0 && <button type="button" onClick={() => setSelectedItems(new Set())} className="text-xs text-white/45 hover:text-white">Clear selection</button>}</div>
+          })}</div></section><section aria-labelledby="audio-download-title" className="rounded-xl border border-[#2389ff]/20 bg-[#1682ff]/[0.045] p-3 sm:p-4"><p className="section-label !text-[0.66rem]">Audio</p><h3 id="audio-download-title" className="mt-1 text-sm font-semibold text-white/90">TikTok audio</h3><p className="mt-2 text-xs leading-5 text-white/40">Extract the available audio as an MP3 file.</p>{mp3Quality ? (() => { const key = "quality:mp3"; const phase = downloadPhases[key]; return <button type="button" disabled={phase === "preparing"} onClick={() => handleQuality("mp3")} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70">{phase === "preparing" && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{phase === "preparing" ? "Preparing MP3..." : phase === "ready" ? "MP3 ready" : phase === "started" ? "Download started" : "Download MP3"}</button>; })() : <p className="mt-4 rounded-lg border border-white/[0.07] px-3 py-2.5 text-xs text-white/35">MP3 is not available for this TikTok.</p>}</section></div> : gallery?.media_type === "image" ? <><div><p className="section-label !text-[0.66rem]">TikTok photo</p><h3 className="mt-1 text-sm font-semibold text-white/90">Download image</h3></div><button type="button" disabled={downloadPhases.all === "preparing"} onClick={handleAll} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(20,120,255,0.2)] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70 sm:w-auto">{downloadPhases.all === "preparing" && <span className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white" />}{downloadPhases.all === "preparing" ? "Preparing..." : downloadPhases.all === "ready" ? "Download ready" : downloadPhases.all === "started" ? "Download started" : "Download Image"}</button></> : gallery ? <>
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="section-label !text-[0.66rem]">Slideshow</p><h3 className="mt-1 text-sm font-semibold text-white/90">TikTok Slideshow</h3><p className="mt-1 text-xs text-white/40">Download one image, select several, or get the complete slideshow.</p></div>{selectedItems.size > 0 && <button type="button" onClick={() => setSelectedItems(new Set())} className="text-xs text-white/45 hover:text-white">Clear selection</button>}</div>
             <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{gallery.items.map((item) => {
               const key = `item:${item.index}`;
               const phase = downloadPhases[key];
@@ -499,7 +444,6 @@ export default function Analyzer() {
           <button type="button" onClick={clearAnalyzer} disabled={anyPreparing} className="mt-4 rounded-lg border border-white/[0.09] bg-white/[0.025] px-3.5 py-2 text-sm font-medium text-white/55 transition hover:border-white/15 hover:bg-white/[0.055] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-not-allowed disabled:opacity-40">Download another</button>
         </div>
       </section>}
-      {media && <AdPlaceholder format="banner" className="mt-8" />}
     </div>
   );
 }

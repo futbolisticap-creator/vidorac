@@ -22,7 +22,7 @@ from .format_presets import (
 
 
 logger = logging.getLogger("clipora.analyzer")
-MAX_ANALYZED_DOWNLOAD_SIZE = 1024 * 1024 * 1024
+MAX_ANALYZED_DOWNLOAD_SIZE = 250 * 1024 * 1024
 DEVELOPMENT_TIMINGS = os.getenv("VIDORAC_ENV", os.getenv("CLIPORA_ENV", "development")).strip().lower() == "development"
 
 SUPPORTED_HOSTS = {

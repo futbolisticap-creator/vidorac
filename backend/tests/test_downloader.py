@@ -101,6 +101,31 @@ class DownloadValidationTests(unittest.TestCase):
             artifact.path.unlink(missing_ok=True)
             artifact.temp_directory.rmdir()
 
+    def test_tiktok_mp3_uses_creator_title_and_audio_mime(self) -> None:
+        temp_path = Path(tempfile.mkdtemp(prefix="clipora-test-"))
+        downloader = MagicMock()
+
+        def write_download(_url: str, *, download: bool) -> dict[str, object]:
+            self.assertTrue(download)
+            (temp_path / "123.mp3").write_bytes(b"ID3 valid test audio")
+            return {"id": "123", "title": "A / caption", "uploader": "Creator"}
+
+        downloader.__enter__.return_value.extract_info.side_effect = write_download
+        with (
+            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
+            patch("app.downloader.is_ffmpeg_available", return_value=True),
+        ):
+            artifact = download_media("https://www.tiktok.com/@creator/video/123", DownloadQuality.MP3)
+
+        try:
+            self.assertEqual(artifact.download_name, "Creator - A caption.mp3")
+            self.assertEqual(artifact.media_type, "audio/mpeg")
+            self.assertGreater(artifact.path.stat().st_size, 0)
+        finally:
+            artifact.path.unlink(missing_ok=True)
+            artifact.temp_directory.rmdir()
+
 
 class PresetTests(unittest.TestCase):
     def test_video_presets_use_orientation_aware_callable(self) -> None:
@@ -146,6 +171,7 @@ class PresetTests(unittest.TestCase):
         self.assertTrue(callable(options["format"]))
         self.assertTrue(options["noplaylist"])
         self.assertIn("no-certifi", options["compat_opts"])
+        self.assertEqual(MAX_FILESIZE_BYTES, 250 * 1024 * 1024)
 
     def test_compatible_preset_prefers_h264_aac_and_mp4(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

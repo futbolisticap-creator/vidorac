@@ -13,7 +13,9 @@ export default function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-1 text-sm text-[var(--text-muted)]">
           <Link href="/" className="header-link header-home-link">Home</Link>
-          <Link href="/#how-it-works" className="header-link header-how-link">How it works</Link>
+          <Link href="/tiktok-downloader" className="header-link header-tiktok-link">TikTok Downloader</Link>
+          <Link href="/tiktok-mp3-downloader" className="header-link header-mp3-link">MP3</Link>
+          <Link href="/contact" className="header-link header-contact-link">Contact</Link>
           <SupportButton />
         </div>
       </nav>

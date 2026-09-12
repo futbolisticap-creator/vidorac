@@ -1,6 +1,12 @@
 import pytest
 
-from app.runtime_config import allowed_origins_from_env, max_concurrent_jobs_from_env
+from app.runtime_config import (
+    SUPPORTED_PUBLIC_PLATFORMS,
+    allowed_origins_from_env,
+    max_concurrent_jobs_from_env,
+    preparation_rate_limit_from_env,
+    public_platforms_from_env,
+)
 
 
 def test_allowed_origins_default_to_local_frontend() -> None:
@@ -34,3 +40,31 @@ def test_max_concurrent_jobs_accepts_safe_limits(value: str, expected: int) -> N
 def test_max_concurrent_jobs_rejects_invalid_limits(value: str) -> None:
     with pytest.raises(ValueError):
         max_concurrent_jobs_from_env(value)
+
+
+def test_public_platforms_default_preserves_shared_backend_core() -> None:
+    assert public_platforms_from_env("") == SUPPORTED_PUBLIC_PLATFORMS
+
+
+def test_public_platforms_can_restrict_a_deployment_to_tiktok() -> None:
+    assert public_platforms_from_env(" tiktok ") == frozenset({"tiktok"})
+
+
+@pytest.mark.parametrize("value", ["", "tiktok,unknown", "youtube,twitch"])
+def test_public_platforms_reject_invalid_nonempty_values(value: str) -> None:
+    if not value:
+        assert public_platforms_from_env(value) == SUPPORTED_PUBLIC_PLATFORMS
+    else:
+        with pytest.raises(ValueError):
+            public_platforms_from_env(value)
+
+
+@pytest.mark.parametrize(("value", "expected"), [("1", 1), ("12", 12), ("120", 120)])
+def test_preparation_rate_limit_accepts_safe_values(value: str, expected: int) -> None:
+    assert preparation_rate_limit_from_env(value) == expected
+
+
+@pytest.mark.parametrize("value", ["0", "121", "many"])
+def test_preparation_rate_limit_rejects_invalid_values(value: str) -> None:
+    with pytest.raises(ValueError):
+        preparation_rate_limit_from_env(value)
