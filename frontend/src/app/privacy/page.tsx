@@ -1,4 +1,5 @@
-import InformationPage, { CONTACT_EMAIL, CONTACT_MAILTO } from "../information-page";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "../contact-config";
+import InformationPage from "../information-page";
 import { informationMetadata } from "../seo";
 
 export const metadata = informationMetadata({
@@ -24,6 +25,11 @@ export default function PrivacyPage() {
           <li>Technical data needed to receive and complete your request.</li>
           <li>Basic network and server information that may appear in technical logs, such as an IP address, user agent, timestamp and error details.</li>
         </ul>
+      </section>
+
+      <section>
+        <h2>Contact form</h2>
+        <p>When you submit the contact form, Vidorac processes the information you provide, such as your email address, subject and message, for the purpose of responding to your enquiry. The form is processed using Formspree, a third-party form provider. Formspree handles submitted information according to its own policies.</p>
       </section>
 
       <section>

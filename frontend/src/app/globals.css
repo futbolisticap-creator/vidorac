@@ -905,6 +905,145 @@ button { -webkit-tap-highlight-color: transparent; }
 .information-links a { color: inherit; text-decoration: none; }
 .information-links a:hover { color: var(--text); }
 
+.contact-form-section {
+  padding-top: 2.5rem !important;
+}
+
+.contact-form {
+  display: grid;
+  width: 100%;
+  max-width: 45rem;
+  gap: 1.25rem;
+}
+
+.contact-field {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.contact-field label {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.contact-field input,
+.contact-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(139, 167, 199, 0.22);
+  border-radius: 9px;
+  background: rgba(9, 22, 38, 0.86);
+  color: var(--text);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.contact-field input {
+  min-height: 3rem;
+  padding: 0.7rem 0.85rem;
+}
+
+.contact-field textarea {
+  min-height: 12.5rem;
+  resize: vertical;
+  padding: 0.8rem 0.85rem;
+  line-height: 1.55;
+}
+
+.contact-field input::placeholder,
+.contact-field textarea::placeholder { color: #64758a; }
+
+.contact-field input:focus,
+.contact-field textarea:focus {
+  border-color: rgba(104, 211, 255, 0.62);
+  background: rgba(11, 27, 47, 0.95);
+  box-shadow: 0 0 0 3px rgba(22, 119, 242, 0.12);
+}
+
+.contact-field input[aria-invalid="true"],
+.contact-field textarea[aria-invalid="true"] {
+  border-color: rgba(243, 154, 159, 0.65);
+}
+
+.contact-field input:disabled,
+.contact-field textarea:disabled { opacity: 0.65; }
+
+.contact-field-help {
+  justify-self: end;
+  color: var(--text-faint) !important;
+  font-size: 0.72rem !important;
+  line-height: 1 !important;
+}
+
+.contact-field-error {
+  color: var(--error) !important;
+  font-size: 0.78rem !important;
+  line-height: 1.35 !important;
+}
+
+.contact-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.contact-submit {
+  display: inline-flex;
+  width: fit-content;
+  min-width: 8.5rem;
+  min-height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.15rem;
+  border: 1px solid rgba(104, 211, 255, 0.28);
+  border-radius: 9px;
+  background: var(--blue);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.contact-submit:hover:not(:disabled) { background: var(--blue-hover); }
+.contact-submit:active:not(:disabled) { transform: translateY(1px); }
+.contact-submit:disabled { cursor: wait; opacity: 0.7; }
+.contact-submit:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+.contact-form-status:empty { display: none; }
+
+.contact-status,
+.contact-form-fallback {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(11, 23, 39, 0.72);
+}
+
+.contact-status h3,
+.contact-form-fallback h2 {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.contact-status p,
+.contact-form-fallback p {
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.contact-status a { color: #78ceff; text-decoration: underline; text-underline-offset: 0.2em; }
+.contact-status-success { border-color: rgba(66, 211, 146, 0.28); }
+.contact-status-error { border-color: rgba(243, 154, 159, 0.3); }
+
 @keyframes result-in {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -944,6 +1083,7 @@ button { -webkit-tap-highlight-color: transparent; }
   .ad-dimensions { display: none; }
   .platform-hero { min-height: auto; padding-top: 7.5rem; }
   .supported-sites-grid { grid-template-columns: 1fr; }
+  .contact-submit { width: 100%; }
 }
 
 @media (max-width: 390px) {
@@ -971,6 +1111,9 @@ button { -webkit-tap-highlight-color: transparent; }
   .gallery-item,
   .header-link,
   .support-button,
+  .contact-field input,
+  .contact-field textarea,
+  .contact-submit,
   .analyzer-form,
   .analysis-wait-card,
   .analysis-retry-button { transition: none; }

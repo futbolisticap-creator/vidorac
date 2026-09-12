@@ -1,5 +1,7 @@
-import InformationPage, { CONTACT_EMAIL, CONTACT_MAILTO } from "../information-page";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "../contact-config";
+import InformationPage from "../information-page";
 import { informationMetadata } from "../seo";
+import ContactForm from "./contact-form";
 
 export const metadata = informationMetadata({
   title: "Contact Vidorac | Vidorac Beta",
@@ -12,18 +14,16 @@ export default function ContactPage() {
     <InformationPage
       eyebrow="Contact"
       title="Contact Vidorac"
-      intro="Need to get in touch with Vidorac? For questions, feedback, bug reports, copyright concerns or general enquiries, you can contact us by email."
+      intro="Have a question, found a bug or want to send feedback? Send us a message below."
     >
-      <section>
-        <h2>Email</h2>
-        <p>Write to us at <a className="information-email" href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>.</p>
-        <a className="information-button" href={CONTACT_MAILTO} aria-label={`Email Vidorac at ${CONTACT_EMAIL}`}>Email Vidorac</a>
+      <section className="contact-form-section" aria-label="Send Vidorac a message">
+        <ContactForm />
       </section>
 
       <section>
-        <h2>Feedback</h2>
-        <p>Have an idea or found something that could be improved? We&apos;re building Vidorac in public beta and would love to hear what you think.</p>
-        <a className="information-button information-button-secondary" href={`${CONTACT_MAILTO}?subject=Vidorac%20feedback`}>Send feedback</a>
+        <h2>Prefer email?</h2>
+        <p>You can also contact us directly at <a className="information-email" href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a>.</p>
+        <a className="information-button information-button-secondary" href={CONTACT_MAILTO} aria-label={`Email Vidorac at ${CONTACT_EMAIL}`}>Email Vidorac</a>
       </section>
 
       <section>
@@ -36,6 +36,7 @@ export default function ContactPage() {
           <li>Proof or an explanation of your rights when applicable.</li>
           <li>Your preferred contact information.</li>
         </ul>
+        <a className="information-button information-button-secondary" href={`${CONTACT_MAILTO}?subject=Copyright%20or%20removal%20request`}>Email about copyright</a>
       </section>
     </InformationPage>
   );

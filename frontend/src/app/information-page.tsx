@@ -2,9 +2,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import SiteFooter from "./site-footer";
 
-export const CONTACT_EMAIL = "footyhub.es@gmail.com";
-export const CONTACT_MAILTO = `mailto:${CONTACT_EMAIL}`;
-
 export default function InformationPage({
   eyebrow,
   title,

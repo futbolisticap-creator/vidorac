@@ -1,4 +1,5 @@
-import InformationPage, { CONTACT_EMAIL, CONTACT_MAILTO } from "../information-page";
+import { CONTACT_EMAIL, CONTACT_MAILTO } from "../contact-config";
+import InformationPage from "../information-page";
 import { informationMetadata } from "../seo";
 
 export const metadata = informationMetadata({
