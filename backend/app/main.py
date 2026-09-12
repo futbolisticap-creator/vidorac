@@ -57,6 +57,7 @@ from .media_gallery import (
     GalleryContentUnavailableError,
     GallerySourceBlockedError,
     GalleryTemporaryError,
+    GalleryTimeoutError,
     GallerySizeLimitError,
     GalleryTooManyItemsError,
     download_gallery_post,
@@ -213,6 +214,13 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
             status_code=429,
             content={"success": False, "detail": "The source temporarily rejected the request. Please try again later."},
         )
+    except GalleryTimeoutError as error:
+        detail = (
+            "Instagram is taking too long to respond. Please try again in a moment or try another public post."
+            if error.platform == "instagram"
+            else "The source platform is taking too long to respond. Please try again in a moment."
+        )
+        return JSONResponse(status_code=504, content={"success": False, "detail": detail})
     except GalleryTemporaryError:
         return JSONResponse(
             status_code=503,

@@ -1,9 +1,11 @@
 import logging
+import os
 import re
 import shutil
 from collections.abc import Mapping
+from time import perf_counter
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from .tls_certs import configure_windows_ca_bundle
 
@@ -21,6 +23,7 @@ from .format_presets import (
 
 logger = logging.getLogger("clipora.analyzer")
 MAX_ANALYZED_DOWNLOAD_SIZE = 1024 * 1024 * 1024
+DEVELOPMENT_TIMINGS = os.getenv("VIDORAC_ENV", os.getenv("CLIPORA_ENV", "development")).strip().lower() == "development"
 
 SUPPORTED_HOSTS = {
     "youtube.com": "youtube",
@@ -227,6 +230,23 @@ def validate_and_classify_url(raw_url: str) -> tuple[str, str]:
             return url, platform
 
     raise UnsupportedUrlError
+
+
+def normalize_url_for_extraction(url: str, platform: str) -> str:
+    """Remove non-identifying Instagram tracking data after host validation."""
+    if platform != "instagram":
+        return url
+    parsed = urlsplit(url)
+    path = parsed.path
+    if not re.fullmatch(r"/(?:p|reel|reels|tv)/[A-Za-z0-9_-]+/?", path):
+        return url
+    normalized_path = f"{path.rstrip('/')}/"
+    return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, "", ""))
+
+
+def _timing(label: str, started_at: float) -> None:
+    if DEVELOPMENT_TIMINGS:
+        logger.info("%s: %.1f ms", label, (perf_counter() - started_at) * 1000)
 
 
 def ensure_individual_media_url(url: str, platform: str) -> None:
@@ -462,6 +482,7 @@ def build_quality_options(info: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def analyze_media(raw_url: str) -> dict[str, Any]:
     url, platform = validate_and_classify_url(raw_url)
+    url = normalize_url_for_extraction(url, platform)
     ensure_individual_media_url(url, platform)
 
     try:
@@ -536,7 +557,12 @@ def analyze_media(raw_url: str) -> dict[str, Any]:
 
 def analyze_content(raw_url: str) -> dict[str, Any]:
     """Select the extractor without asking the browser to classify the post."""
+    validation_started = perf_counter()
     url, platform = validate_and_classify_url(raw_url)
+    _timing("url validation and platform detection", validation_started)
+    normalization_started = perf_counter()
+    url = normalize_url_for_extraction(url, platform)
+    _timing(f"{platform} normalization", normalization_started)
     ensure_individual_media_url(url, platform)
 
     media_post_platforms = {"instagram", "tiktok", "x", "reddit", "facebook"}
@@ -546,16 +572,26 @@ def analyze_content(raw_url: str) -> dict[str, Any]:
     # the complete ordered post; a lone video is deliberately rejected there and
     # falls through to yt-dlp for the existing quality-selector workflow.
     if platform in media_post_platforms and _prefers_gallery_detection(url, platform):
-        from .media_gallery import GalleryAnalysisError, analyze_gallery_post
+        from .media_gallery import GalleryAnalysisError, GalleryTimeoutError, analyze_gallery_post
 
+        gallery_started = perf_counter()
         try:
-            return analyze_gallery_post(url, platform)
+            result = analyze_gallery_post(url, platform)
+            _timing("gallery-dl extraction", gallery_started)
+            return result
         except GalleryAnalysisError as exc:
+            _timing("gallery-dl extraction failed", gallery_started)
+            if platform == "instagram" and isinstance(exc, GalleryTimeoutError):
+                raise
             gallery_error = exc
 
+    video_started = perf_counter()
     try:
-        return analyze_media(url)
+        result = analyze_media(url)
+        _timing("yt-dlp extraction", video_started)
+        return result
     except AnalysisFailedError as exc:
+        _timing("yt-dlp extraction failed", video_started)
         if platform not in media_post_platforms:
             raise
         if platform == "tiktok" and "/video/" in urlsplit(url).path:
@@ -566,4 +602,7 @@ def analyze_content(raw_url: str) -> dict[str, Any]:
     # Keep gallery-dl isolated from the video analyzer and avoid an import cycle.
     from .media_gallery import analyze_gallery_post
 
-    return analyze_gallery_post(url, platform)
+    gallery_started = perf_counter()
+    result = analyze_gallery_post(url, platform)
+    _timing("gallery-dl fallback", gallery_started)
+    return result

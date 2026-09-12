@@ -20,9 +20,11 @@ from app.analyzer import (
     build_quality_options,
     extract_max_height,
     ensure_individual_media_url,
+    normalize_url_for_extraction,
     validate_and_classify_url,
 )
 from app.format_presets import get_effective_resolution
+from app.media_gallery import GalleryTimeoutError
 
 
 class UrlValidationTests(unittest.TestCase):
@@ -75,6 +77,35 @@ class UrlValidationTests(unittest.TestCase):
         for url in invalid_urls:
             with self.subTest(url=url), self.assertRaises(InvalidUrlError):
                 validate_and_classify_url(url)
+
+    def test_normalizes_instagram_post_tracking_parameters(self) -> None:
+        self.assertEqual(
+            normalize_url_for_extraction(
+                "https://www.instagram.com/p/Ddk8Iq6J2wB/?stkn=tracking&igsh=other#fragment",
+                "instagram",
+            ),
+            "https://www.instagram.com/p/Ddk8Iq6J2wB/",
+        )
+
+    def test_normalizes_instagram_reel_tracking_parameters(self) -> None:
+        self.assertEqual(
+            normalize_url_for_extraction(
+                "https://www.instagram.com/reel/ABC123?igsh=tracking",
+                "instagram",
+            ),
+            "https://www.instagram.com/reel/ABC123/",
+        )
+
+    def test_does_not_strip_identifying_queries_from_other_platforms(self) -> None:
+        facebook_url = "https://www.facebook.com/watch/?v=123"
+        self.assertEqual(normalize_url_for_extraction(facebook_url, "facebook"), facebook_url)
+
+    def test_instagram_analysis_uses_normalized_url(self) -> None:
+        expected = {"media_type": "image", "platform": "instagram"}
+        with patch("app.media_gallery.analyze_gallery_post", return_value=expected) as gallery:
+            result = analyze_content("https://www.instagram.com/p/Ddk8Iq6J2wB/?stkn=tracking")
+        self.assertEqual(result, expected)
+        gallery.assert_called_once_with("https://www.instagram.com/p/Ddk8Iq6J2wB/", "instagram")
 
     def test_accepts_only_individual_posts_on_new_platforms(self) -> None:
         valid = (
@@ -272,6 +303,20 @@ class UrlValidationTests(unittest.TestCase):
 
 
 class AnalyzeEndpointErrorTests(unittest.TestCase):
+    def test_instagram_timeout_is_retryable_and_not_misclassified_as_private(self) -> None:
+        from app.main import AnalyzeRequest, analyze
+
+        with patch("app.main.analyze_content", side_effect=GalleryTimeoutError("instagram")):
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.instagram.com/p/ABC123/")))
+        payload = json.loads(response.body)
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(
+            payload["detail"],
+            "Instagram is taking too long to respond. Please try again in a moment or try another public post.",
+        )
+        self.assertNotIn("private", payload["detail"].lower())
+        self.assertNotIn("authentication", payload["detail"].lower())
+
     def test_development_response_includes_sanitized_tiktok_error(self) -> None:
         from app.main import AnalyzeRequest, analyze
 

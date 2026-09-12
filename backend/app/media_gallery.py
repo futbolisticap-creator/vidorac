@@ -1,9 +1,13 @@
 import ipaddress
+import json
 import logging
 import mimetypes
+import os
 import shutil
 import socket
 import ssl
+import subprocess
+import sys
 import tempfile
 import threading
 import zipfile
@@ -18,7 +22,7 @@ from requests.adapters import HTTPAdapter
 from truststore import SSLContext
 from urllib3.util.retry import Retry
 
-from .analyzer import ensure_individual_media_url, validate_and_classify_url
+from .analyzer import ensure_individual_media_url, normalize_url_for_extraction, validate_and_classify_url
 from .downloader import DownloadArtifact, safe_download_name
 
 
@@ -27,6 +31,8 @@ logger = logging.getLogger("clipora.gallery")
 MAX_GALLERY_ITEMS = 50
 MAX_GALLERY_SIZE_BYTES = 1024 * 1024 * 1024
 MAX_REDIRECTS = 5
+GALLERY_ANALYSIS_TIMEOUT_SECONDS = 20
+GALLERY_PROCESS_SHUTDOWN_SECONDS = 2
 IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "avif"}
 VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v"}
 GALLERY_PLATFORMS = {"instagram", "tiktok", "x", "reddit", "facebook"}
@@ -60,6 +66,12 @@ class GalleryAuthenticationError(GalleryAnalysisError):
 
 class GalleryTemporaryError(GalleryAnalysisError):
     pass
+
+
+class GalleryTimeoutError(GalleryTemporaryError):
+    def __init__(self, platform: str) -> None:
+        self.platform = platform
+        super().__init__(f"{platform} gallery extraction timed out")
 
 
 class GallerySourceBlockedError(GalleryAnalysisError):
@@ -201,9 +213,10 @@ def _map_gallery_exception(exc: Exception) -> GalleryAnalysisError:
     return GalleryAnalysisError()
 
 
-def extract_gallery_post(raw_url: str, platform: str | None = None) -> GalleryExtraction:
+def _extract_gallery_post_direct(raw_url: str, platform: str | None = None) -> GalleryExtraction:
     url, actual_platform = validate_and_classify_url(raw_url)
     platform = platform or actual_platform
+    url = normalize_url_for_extraction(url, platform)
     ensure_individual_media_url(url, platform)
     if platform not in GALLERY_PLATFORMS:
         raise GalleryAnalysisError
@@ -213,6 +226,8 @@ def extract_gallery_post(raw_url: str, platform: str | None = None) -> GalleryEx
         (("extractor",), "cookies", None),
         (("extractor",), "cookies-update", False),
         (("extractor",), "truststore", True),
+        (("extractor",), "timeout", 8.0),
+        (("extractor",), "retries", 1),
         (("output",), "private", True),
     )
     try:
@@ -272,6 +287,124 @@ def extract_gallery_post(raw_url: str, platform: str | None = None) -> GalleryEx
     extraction = GalleryExtraction(title, uploader, platform, tuple(items))
     extraction.media_type  # Validate that this is not a lone video result.
     return extraction
+
+
+def _serialize_extraction(extraction: GalleryExtraction) -> dict[str, Any]:
+    return {
+        "title": extraction.title,
+        "uploader": extraction.uploader,
+        "platform": extraction.platform,
+        "items": [
+            {
+                "url": item.url,
+                "extension": item.extension,
+                "kind": item.kind,
+                "headers": item.headers,
+                "preview_url": item.preview_url,
+                "width": item.width,
+                "height": item.height,
+                "duration": item.duration,
+            }
+            for item in extraction.items
+        ],
+    }
+
+
+def _deserialize_extraction(payload: Any, expected_platform: str) -> GalleryExtraction:
+    if not isinstance(payload, dict) or payload.get("platform") != expected_platform:
+        raise GalleryAnalysisError
+    raw_items = payload.get("items")
+    if not isinstance(raw_items, list):
+        raise GalleryAnalysisError
+    try:
+        items = tuple(
+            GalleryItem(
+                url=item["url"],
+                extension=item["extension"],
+                kind=item["kind"],
+                headers=item.get("headers") or {},
+                preview_url=item.get("preview_url"),
+                width=item.get("width"),
+                height=item.get("height"),
+                duration=item.get("duration"),
+            )
+            for item in raw_items
+            if isinstance(item, dict)
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise GalleryAnalysisError from exc
+    extraction = GalleryExtraction(payload.get("title"), payload.get("uploader"), expected_platform, items)
+    extraction.media_type
+    return extraction
+
+
+_WORKER_ERRORS: dict[str, type[GalleryError]] = {
+    cls.__name__: cls
+    for cls in (
+        GalleryAnalysisError,
+        GalleryAuthenticationError,
+        GalleryTemporaryError,
+        GallerySourceBlockedError,
+        GalleryContentUnavailableError,
+        GalleryTooManyItemsError,
+    )
+}
+
+
+def _terminate_worker(process: subprocess.Popen[str]) -> None:
+    process.terminate()
+    try:
+        process.communicate(timeout=GALLERY_PROCESS_SHUTDOWN_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+
+
+def _run_gallery_worker(url: str, platform: str) -> GalleryExtraction:
+    backend_root = Path(__file__).resolve().parents[1]
+    environment = os.environ.copy()
+    environment["PYTHONIOENCODING"] = "utf-8"
+    process = subprocess.Popen(
+        [sys.executable, "-m", "app.gallery_worker", url, platform],
+        cwd=backend_root,
+        env=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=GALLERY_ANALYSIS_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        _terminate_worker(process)
+        logger.warning("gallery-dl analysis exceeded %s seconds for %s", GALLERY_ANALYSIS_TIMEOUT_SECONDS, platform)
+        raise GalleryTimeoutError(platform) from exc
+
+    if process.returncode != 0:
+        logger.warning("gallery-dl worker failed for %s: %s", platform, " ".join(stderr.split())[:240])
+        raise GalleryAnalysisError
+    try:
+        output_lines = [line for line in stdout.splitlines() if line.strip()]
+        payload = json.loads(output_lines[-1])
+    except (IndexError, json.JSONDecodeError, TypeError) as exc:
+        raise GalleryAnalysisError from exc
+    if not isinstance(payload, dict) or payload.get("ok") is not True:
+        error_type = _WORKER_ERRORS.get(payload.get("error") if isinstance(payload, dict) else "")
+        if error_type is GalleryTooManyItemsError:
+            raise GalleryTooManyItemsError
+        raise (error_type or GalleryAnalysisError)()
+    return _deserialize_extraction(payload.get("extraction"), platform)
+
+
+def extract_gallery_post(raw_url: str, platform: str | None = None) -> GalleryExtraction:
+    url, actual_platform = validate_and_classify_url(raw_url)
+    platform = platform or actual_platform
+    url = normalize_url_for_extraction(url, platform)
+    ensure_individual_media_url(url, platform)
+    if platform not in GALLERY_PLATFORMS:
+        raise GalleryAnalysisError
+    return _run_gallery_worker(url, platform)
 
 
 def analyze_gallery_post(raw_url: str, platform: str | None = None) -> dict[str, Any]:

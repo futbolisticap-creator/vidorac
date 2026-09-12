@@ -1,3 +1,5 @@
+import json
+import subprocess
 import tempfile
 import unittest
 import zipfile
@@ -20,15 +22,19 @@ from app.media_gallery import (
     GalleryItem,
     GallerySizeLimitError,
     GalleryTooManyItemsError,
+    GalleryTimeoutError,
     _create_safe_zip,
     _download_item,
+    _extract_gallery_post_direct,
+    _run_gallery_worker,
+    _serialize_extraction,
     analyze_gallery_post,
     download_gallery_post,
     extract_gallery_post,
 )
 
 
-def extraction(*extensions: str, title: str = "A post") -> GalleryExtraction:
+def extraction(*extensions: str, title: str = "A post", platform: str = "instagram") -> GalleryExtraction:
     items = tuple(
         GalleryItem(
             url=f"https://cdn.example.com/{index}.{extension}",
@@ -38,7 +44,7 @@ def extraction(*extensions: str, title: str = "A post") -> GalleryExtraction:
         )
         for index, extension in enumerate(extensions, 1)
     )
-    return GalleryExtraction(title, "creator", "instagram", items)
+    return GalleryExtraction(title, "creator", platform, items)
 
 
 def mock_data_job(*extensions: str) -> MagicMock:
@@ -65,13 +71,13 @@ class DetectionTests(unittest.TestCase):
         gallery.assert_not_called()
 
     def test_image_detection(self) -> None:
-        with patch("app.media_gallery.job.DataJob", return_value=mock_data_job("jpg")):
+        with patch("app.media_gallery._run_gallery_worker", return_value=extraction("jpg")):
             media = analyze_gallery_post("https://www.instagram.com/p/ABC123/")
         self.assertEqual(media["media_type"], "image")
         self.assertEqual(media["item_count"], 1)
 
     def test_gallery_detection(self) -> None:
-        with patch("app.media_gallery.job.DataJob", return_value=mock_data_job("jpg", "webp", "png")):
+        with patch("app.media_gallery._run_gallery_worker", return_value=extraction("jpg", "webp", "png")):
             media = analyze_gallery_post("https://www.instagram.com/p/ABC123/")
         self.assertEqual(media["media_type"], "gallery")
         self.assertEqual(media["item_count"], 3)
@@ -80,7 +86,7 @@ class DetectionTests(unittest.TestCase):
         self.assertNotIn("url", media["items"][0])
 
     def test_mixed_detection(self) -> None:
-        with patch("app.media_gallery.job.DataJob", return_value=mock_data_job("jpg", "mp4", "png")):
+        with patch("app.media_gallery._run_gallery_worker", return_value=extraction("jpg", "mp4", "png")):
             media = analyze_gallery_post("https://www.instagram.com/p/ABC123/")
         self.assertEqual(media["media_type"], "mixed")
         self.assertEqual([item["type"] for item in media["items"]], ["image", "video", "image"])
@@ -93,7 +99,8 @@ class DetectionTests(unittest.TestCase):
         )
         for url, platform, extensions in cases:
             with self.subTest(platform=platform), patch(
-                "app.media_gallery.job.DataJob", return_value=mock_data_job(*extensions)
+                "app.media_gallery._run_gallery_worker",
+                return_value=extraction(*extensions, platform=platform),
             ):
                 media = analyze_gallery_post(url)
             self.assertEqual(media["platform"], platform)
@@ -121,6 +128,15 @@ class DetectionTests(unittest.TestCase):
         with patch("app.analyzer.analyze_media", return_value=video) as yt:
             self.assertEqual(analyze_content("https://www.instagram.com/reel/ABC123/"), video)
         yt.assert_called_once()
+
+    def test_instagram_gallery_timeout_does_not_chain_another_slow_extractor(self) -> None:
+        with (
+            patch("app.media_gallery.analyze_gallery_post", side_effect=GalleryTimeoutError("instagram")),
+            patch("app.analyzer.analyze_media") as video,
+            self.assertRaises(GalleryTimeoutError),
+        ):
+            analyze_content("https://www.instagram.com/p/ABC123/")
+        video.assert_not_called()
 
     def test_image_post_falls_back_after_video_analysis_fails(self) -> None:
         expected = {"media_type": "image", "platform": "instagram"}
@@ -163,14 +179,58 @@ class ScopeAndLimitTests(unittest.TestCase):
             patch("app.media_gallery.job.DataJob", return_value=data_job),
             self.assertRaises(GalleryTooManyItemsError),
         ):
-            extract_gallery_post("https://www.instagram.com/p/ABC123/")
+            _extract_gallery_post_direct("https://www.instagram.com/p/ABC123/")
 
     def test_rejects_lone_video_from_gallery_engine(self) -> None:
         with (
             patch("app.media_gallery.job.DataJob", return_value=mock_data_job("mp4")),
             self.assertRaises(GalleryAnalysisError),
         ):
-            extract_gallery_post("https://www.instagram.com/p/ABC123/")
+            _extract_gallery_post_direct("https://www.instagram.com/p/ABC123/")
+
+
+class IsolatedGalleryWorkerTests(unittest.TestCase):
+    def test_worker_result_is_deserialized(self) -> None:
+        process = MagicMock()
+        process.returncode = 0
+        process.communicate.return_value = (
+            json.dumps({"ok": True, "extraction": _serialize_extraction(extraction("jpg"))}),
+            "",
+        )
+        with patch("app.media_gallery.subprocess.Popen", return_value=process):
+            result = _run_gallery_worker("https://www.instagram.com/p/ABC123/", "instagram")
+        self.assertEqual(result.media_type, "image")
+        process.communicate.assert_called_once_with(timeout=20)
+
+    def test_timeout_terminates_worker_without_leaving_it_running(self) -> None:
+        process = MagicMock()
+        process.communicate.side_effect = [
+            subprocess.TimeoutExpired("gallery-worker", 20),
+            ("", ""),
+        ]
+        with (
+            patch("app.media_gallery.subprocess.Popen", return_value=process),
+            self.assertRaises(GalleryTimeoutError) as caught,
+        ):
+            _run_gallery_worker("https://www.instagram.com/p/ABC123/", "instagram")
+        self.assertEqual(caught.exception.platform, "instagram")
+        process.terminate.assert_called_once()
+        process.kill.assert_not_called()
+
+    def test_worker_is_killed_if_graceful_termination_times_out(self) -> None:
+        process = MagicMock()
+        process.communicate.side_effect = [
+            subprocess.TimeoutExpired("gallery-worker", 20),
+            subprocess.TimeoutExpired("gallery-worker", 2),
+            ("", ""),
+        ]
+        with (
+            patch("app.media_gallery.subprocess.Popen", return_value=process),
+            self.assertRaises(GalleryTimeoutError),
+        ):
+            _run_gallery_worker("https://www.instagram.com/p/ABC123/", "instagram")
+        process.terminate.assert_called_once()
+        process.kill.assert_called_once()
 
 
 class DownloadAndZipTests(unittest.TestCase):

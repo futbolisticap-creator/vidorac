@@ -22,7 +22,6 @@ type AnalysisWaitState =
   | "idle"
   | "analyzing"
   | "starting"
-  | "almost-ready"
   | "taking-longer"
   | "timed-out";
 
@@ -118,6 +117,7 @@ function formatEstimatedSize(bytes: number | null): string | null {
 
 function publicAnalyzeError(detail?: string): string {
   if (detail === "Invalid URL.") return "Please paste a valid URL.";
+  if (detail?.startsWith("Instagram is taking too long")) return detail;
   if (detail?.startsWith("TikTok temporarily") || detail?.startsWith("This TikTok")) return detail;
   if (detail?.startsWith("YouTube ")) return detail;
   if (detail?.startsWith("Unsupported URL.")) return "Vidorac supports YouTube, TikTok, Instagram, X, Reddit and Facebook.";
@@ -230,11 +230,8 @@ export default function Analyzer() {
         if (analysisRequestId.current === requestId) setAnalysisWaitState("starting");
       }, 3_000),
       setTimeout(() => {
-        if (analysisRequestId.current === requestId) setAnalysisWaitState("almost-ready");
-      }, 15_000),
-      setTimeout(() => {
         if (analysisRequestId.current === requestId) setAnalysisWaitState("taking-longer");
-      }, 45_000),
+      }, 15_000),
       setTimeout(() => {
         if (analysisRequestId.current !== requestId) return;
         didTimeout = true;
@@ -410,15 +407,17 @@ export default function Analyzer() {
   const gallery = media && media.media_type !== "video" ? media : null;
   const anyPreparing = Object.values(downloadPhases).includes("preparing");
   const metadata = media ? isVideo ? [displayPlatform(media.platform), formatDuration(media.duration), media.max_height ? `${media.max_height}p max` : null].filter(Boolean) : [displayPlatform(media.platform), media.media_type === "image" ? "1 image" : `${media.item_count} ${media.media_type === "gallery" ? "images" : "media items"}`] : [];
+  const timedOutPlatform = retryUrl ? detectPlatformFromUrl(retryUrl) : null;
   const waitCopy = analysisWaitState === "starting"
-    ? { title: "Starting Vidorac…", text: "Our free server is waking up. This can take up to a minute after a period of inactivity." }
-    : analysisWaitState === "almost-ready"
-      ? { title: "Almost ready…", text: "Thanks for your patience. Vidorac is starting the download service." }
-      : analysisWaitState === "taking-longer"
-        ? { title: "Almost ready…", text: "The server is taking a little longer to start. Please keep this tab open." }
-        : analysisWaitState === "timed-out"
-          ? { title: "Vidorac is taking longer than expected to start.", text: "Please try again. The free server may still be starting." }
-          : null;
+    ? { title: "Analyzing your link…", text: "Checking the public post and its available media." }
+    : analysisWaitState === "taking-longer"
+      ? { title: "This is taking longer than usual…", text: "The source platform may be responding slowly. Please keep this tab open." }
+      : analysisWaitState === "timed-out"
+        ? {
+            title: timedOutPlatform === "instagram" ? "Instagram is taking too long to respond." : "The source platform is taking too long to respond.",
+            text: timedOutPlatform === "instagram" ? "Please try again in a moment or try another public post." : "Please try again in a moment.",
+          }
+        : null;
 
   return (
     <div className="downloader-shell mt-8 w-full max-w-5xl text-left">
@@ -430,7 +429,7 @@ export default function Analyzer() {
         </div>
         <div aria-live="polite" aria-atomic="true">
           {waitCopy && <div id="analysis-status" className="analysis-wait-card" role="status">
-            {analysisWaitState !== "timed-out" && <><span aria-hidden="true" className="analysis-wait-spinner" /><span className="sr-only">Vidorac is still starting.</span></>}
+            {analysisWaitState !== "timed-out" && <><span aria-hidden="true" className="analysis-wait-spinner" /><span className="sr-only">Vidorac is still analyzing the link.</span></>}
             <div><h2>{waitCopy.title}</h2><p>{waitCopy.text}</p></div>
             {analysisWaitState === "timed-out" && <button type="button" onClick={retryAnalysis} className="analysis-retry-button">Try again</button>}
           </div>}
