@@ -111,7 +111,11 @@ export default function Home() {
             <Link key={item.slug} href={`/${item.slug}`} className="supported-site-card">
               <span className="supported-site-heading">
                 <span className="supported-site-name">{item.name}</span>
-                {!platformStatus[platformBySlug[item.slug]].enabled && <span className="platform-status-badge">Temporarily unavailable</span>}
+                {platformStatus[platformBySlug[item.slug]].status !== "available" && (
+                  <span className="platform-status-badge">
+                    {platformStatus[platformBySlug[item.slug]].statusLabel}
+                  </span>
+                )}
               </span>
               <span>{item.media}</span>
               <span className="supported-site-cta">Learn more →</span>

@@ -572,7 +572,12 @@ def analyze_content(raw_url: str) -> dict[str, Any]:
     # the complete ordered post; a lone video is deliberately rejected there and
     # falls through to yt-dlp for the existing quality-selector workflow.
     if platform in media_post_platforms and _prefers_gallery_detection(url, platform):
-        from .media_gallery import GalleryAnalysisError, GalleryTimeoutError, analyze_gallery_post
+        from .media_gallery import (
+            GalleryAnalysisError,
+            GalleryTimeoutError,
+            InstagramPostTemporarilyUnavailableError,
+            analyze_gallery_post,
+        )
 
         gallery_started = perf_counter()
         try:
@@ -581,7 +586,9 @@ def analyze_content(raw_url: str) -> dict[str, Any]:
             return result
         except GalleryAnalysisError as exc:
             _timing("gallery-dl extraction failed", gallery_started)
-            if platform == "instagram" and isinstance(exc, GalleryTimeoutError):
+            if platform == "instagram" and isinstance(
+                exc, (GalleryTimeoutError, InstagramPostTemporarilyUnavailableError)
+            ):
                 raise
             gallery_error = exc
 

@@ -77,7 +77,10 @@ export default function PlatformLanding({ content }: { content: PlatformPageCont
 
       <nav className="seo-section related-platforms seo-section-bordered" aria-label="Other supported platforms">
         <h2>Explore other supported sites</h2>
-        <div>{platformLinks.filter((item) => item.slug !== content.slug).map((item) => <Link key={item.slug} href={`/${item.slug}`}>{item.name}<span>{item.media}</span>{!platformStatus[platformBySlug[item.slug]].enabled && <span className="platform-status-badge">Temporarily unavailable</span>}</Link>)}</div>
+        <div>{platformLinks.filter((item) => item.slug !== content.slug).map((item) => {
+          const status = platformStatus[platformBySlug[item.slug]];
+          return <Link key={item.slug} href={`/${item.slug}`}>{item.name}<span>{item.media}</span>{status.status !== "available" && <span className="platform-status-badge">{status.statusLabel}</span>}</Link>;
+        })}</div>
       </nav>
       <SiteFooter />
     </main>

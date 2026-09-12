@@ -24,7 +24,6 @@ from app.analyzer import (
     validate_and_classify_url,
 )
 from app.format_presets import get_effective_resolution
-from app.media_gallery import GalleryTimeoutError
 
 
 class UrlValidationTests(unittest.TestCase):
@@ -303,16 +302,17 @@ class UrlValidationTests(unittest.TestCase):
 
 
 class AnalyzeEndpointErrorTests(unittest.TestCase):
-    def test_instagram_timeout_is_retryable_and_not_misclassified_as_private(self) -> None:
+    def test_instagram_post_restriction_is_useful_and_not_misclassified_as_private(self) -> None:
         from app.main import AnalyzeRequest, analyze
+        from app.media_gallery import InstagramPostTemporarilyUnavailableError
 
-        with patch("app.main.analyze_content", side_effect=GalleryTimeoutError("instagram")):
+        with patch("app.main.analyze_content", side_effect=InstagramPostTemporarilyUnavailableError):
             response = asyncio.run(analyze(AnalyzeRequest(url="https://www.instagram.com/p/ABC123/")))
         payload = json.loads(response.body)
-        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.status_code, 503)
         self.assertEqual(
             payload["detail"],
-            "Instagram is taking too long to respond. Please try again in a moment or try another public post.",
+            "Instagram photo and carousel posts are temporarily unavailable. Instagram is currently restricting anonymous access to some public posts. Reels are still supported.",
         )
         self.assertNotIn("private", payload["detail"].lower())
         self.assertNotIn("authentication", payload["detail"].lower())

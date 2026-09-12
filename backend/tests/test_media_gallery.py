@@ -16,16 +16,18 @@ from app.download_registry import PreparedDownloadRegistry, cleanup_prepared_dow
 from app.media_gallery import (
     MAX_GALLERY_ITEMS,
     GalleryAnalysisError,
+    GalleryAuthenticationError,
     GalleryDownloadError,
     GalleryExtraction,
     GalleryIndexError,
     GalleryItem,
     GallerySizeLimitError,
     GalleryTooManyItemsError,
-    GalleryTimeoutError,
+    InstagramPostTemporarilyUnavailableError,
     _create_safe_zip,
     _download_item,
     _extract_gallery_post_direct,
+    _map_gallery_exception,
     _run_gallery_worker,
     _serialize_extraction,
     analyze_gallery_post,
@@ -131,9 +133,12 @@ class DetectionTests(unittest.TestCase):
 
     def test_instagram_gallery_timeout_does_not_chain_another_slow_extractor(self) -> None:
         with (
-            patch("app.media_gallery.analyze_gallery_post", side_effect=GalleryTimeoutError("instagram")),
+            patch(
+                "app.media_gallery.analyze_gallery_post",
+                side_effect=InstagramPostTemporarilyUnavailableError,
+            ),
             patch("app.analyzer.analyze_media") as video,
-            self.assertRaises(GalleryTimeoutError),
+            self.assertRaises(InstagramPostTemporarilyUnavailableError),
         ):
             analyze_content("https://www.instagram.com/p/ABC123/")
         video.assert_not_called()
@@ -146,6 +151,14 @@ class DetectionTests(unittest.TestCase):
         ):
             self.assertEqual(analyze_content("https://www.instagram.com/p/ABC123/"), expected)
         gallery.assert_called_once()
+
+    def test_instagram_login_redirect_is_temporary_not_private(self) -> None:
+        error = _map_gallery_exception(
+            RuntimeError("HTTP redirect to login page (https://www.instagram.com/accounts/login/)"),
+            "instagram",
+        )
+        self.assertIsInstance(error, InstagramPostTemporarilyUnavailableError)
+        self.assertNotIsInstance(error, GalleryAuthenticationError)
 
 
 class ScopeAndLimitTests(unittest.TestCase):
@@ -210,10 +223,9 @@ class IsolatedGalleryWorkerTests(unittest.TestCase):
         ]
         with (
             patch("app.media_gallery.subprocess.Popen", return_value=process),
-            self.assertRaises(GalleryTimeoutError) as caught,
+            self.assertRaises(InstagramPostTemporarilyUnavailableError),
         ):
             _run_gallery_worker("https://www.instagram.com/p/ABC123/", "instagram")
-        self.assertEqual(caught.exception.platform, "instagram")
         process.terminate.assert_called_once()
         process.kill.assert_not_called()
 
@@ -226,11 +238,24 @@ class IsolatedGalleryWorkerTests(unittest.TestCase):
         ]
         with (
             patch("app.media_gallery.subprocess.Popen", return_value=process),
-            self.assertRaises(GalleryTimeoutError),
+            self.assertRaises(InstagramPostTemporarilyUnavailableError),
         ):
             _run_gallery_worker("https://www.instagram.com/p/ABC123/", "instagram")
         process.terminate.assert_called_once()
         process.kill.assert_called_once()
+
+    def test_worker_classifies_instagram_login_redirect(self) -> None:
+        process = MagicMock()
+        process.returncode = 0
+        process.communicate.return_value = (
+            json.dumps({"ok": False, "error": "InstagramPostTemporarilyUnavailableError"}),
+            "gallery-dl: HTTP redirect to login page",
+        )
+        with (
+            patch("app.media_gallery.subprocess.Popen", return_value=process),
+            self.assertRaises(InstagramPostTemporarilyUnavailableError),
+        ):
+            _run_gallery_worker("https://www.instagram.com/p/ABC123/", "instagram")
 
 
 class DownloadAndZipTests(unittest.TestCase):

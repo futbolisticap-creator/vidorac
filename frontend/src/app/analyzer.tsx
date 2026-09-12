@@ -117,6 +117,7 @@ function formatEstimatedSize(bytes: number | null): string | null {
 
 function publicAnalyzeError(detail?: string): string {
   if (detail === "Invalid URL.") return "Please paste a valid URL.";
+  if (detail?.startsWith("Instagram photo and carousel posts are temporarily unavailable")) return detail;
   if (detail?.startsWith("Instagram is taking too long")) return detail;
   if (detail?.startsWith("TikTok temporarily") || detail?.startsWith("This TikTok")) return detail;
   if (detail?.startsWith("YouTube ")) return detail;
@@ -129,6 +130,7 @@ function publicAnalyzeError(detail?: string): string {
 
 function publicDownloadError(detail?: string): string {
   if (!detail) return "We couldn't prepare this download. Please try again.";
+  if (detail.startsWith("Instagram photo and carousel posts are temporarily unavailable")) return detail;
   if (detail.startsWith("TikTok temporarily") || detail.startsWith("This TikTok")) return detail;
   if (detail.includes("temporarily")) return "The source temporarily rejected the request. Please try again later.";
   if (detail.includes("authentication")) return "This post requires authentication and isn't publicly accessible.";
@@ -408,6 +410,7 @@ export default function Analyzer() {
   const anyPreparing = Object.values(downloadPhases).includes("preparing");
   const metadata = media ? isVideo ? [displayPlatform(media.platform), formatDuration(media.duration), media.max_height ? `${media.max_height}p max` : null].filter(Boolean) : [displayPlatform(media.platform), media.media_type === "image" ? "1 image" : `${media.item_count} ${media.media_type === "gallery" ? "images" : "media items"}`] : [];
   const timedOutPlatform = retryUrl ? detectPlatformFromUrl(retryUrl) : null;
+  const instagramPostUnavailable = error?.startsWith("Instagram photo and carousel posts are temporarily unavailable") ?? false;
   const waitCopy = analysisWaitState === "starting"
     ? { title: "Analyzing your link…", text: "Checking the public post and its available media." }
     : analysisWaitState === "taking-longer"
@@ -433,7 +436,15 @@ export default function Analyzer() {
             <div><h2>{waitCopy.title}</h2><p>{waitCopy.text}</p></div>
             {analysisWaitState === "timed-out" && <button type="button" onClick={retryAnalysis} className="analysis-retry-button">Try again</button>}
           </div>}
-          {error && <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p>}
+          {instagramPostUnavailable ? (
+            <div id="analyze-error" className="analysis-wait-card" role="alert">
+              <div>
+                <h2>Instagram posts are temporarily unavailable</h2>
+                <p>Instagram is currently restricting anonymous access to some photo and carousel posts. Instagram Reels are still supported.</p>
+              </div>
+              <button type="button" onClick={clearAnalyzer} className="analysis-retry-button">Try another link</button>
+            </div>
+          ) : error ? <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p> : null}
           {error?.startsWith("Instagram is taking too long") && retryUrl && (
             <button type="button" onClick={retryAnalysis} className="analysis-retry-button mt-3">Try again</button>
           )}

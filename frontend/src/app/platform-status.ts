@@ -2,8 +2,12 @@ export type PlatformId = "youtube" | "tiktok" | "instagram" | "x" | "reddit" | "
 
 type PlatformStatus = {
   enabled: boolean;
-  status: "available" | "temporarily_unavailable";
+  status: "available" | "partially_available" | "temporarily_unavailable";
   statusLabel?: string;
+  capabilities?: {
+    reels: boolean;
+    posts: boolean;
+  };
 };
 
 export const platformStatus: Record<PlatformId, PlatformStatus> = {
@@ -13,7 +17,12 @@ export const platformStatus: Record<PlatformId, PlatformStatus> = {
     statusLabel: "Temporarily unavailable",
   },
   tiktok: { enabled: true, status: "available" },
-  instagram: { enabled: true, status: "available" },
+  instagram: {
+    enabled: true,
+    status: "partially_available",
+    statusLabel: "Photo posts temporarily unavailable",
+    capabilities: { reels: true, posts: false },
+  },
   x: { enabled: true, status: "available" },
   reddit: { enabled: true, status: "available" },
   facebook: { enabled: true, status: "available" },
@@ -43,6 +52,12 @@ export const unavailablePlatformCopy = {
   secondary: "TikTok, Instagram, X, Reddit and Facebook remain available.",
   landingText: "YouTube downloads are temporarily unavailable while we improve our beta infrastructure.",
   landingSecondary: "We're working to restore availability. Other supported platforms remain available.",
+} as const;
+
+export const instagramAvailabilityCopy = {
+  title: "Instagram Reels are currently supported",
+  text: "Photo and carousel posts are temporarily unavailable because Instagram is currently restricting anonymous access to this content.",
+  secondary: "You can continue to analyze and download supported public Reels.",
 } as const;
 
 function matchesHostname(hostname: string, allowedHost: string): boolean {

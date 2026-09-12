@@ -20,7 +20,7 @@ export const platformLinks: Array<{
 }> = [
   { slug: "youtube-downloader", name: "YouTube", media: "Videos & audio" },
   { slug: "tiktok-downloader", name: "TikTok", media: "Videos & slideshows" },
-  { slug: "instagram-downloader", name: "Instagram", media: "Reels, images & carousels" },
+  { slug: "instagram-downloader", name: "Instagram", media: "Reels" },
   { slug: "x-downloader", name: "X", media: "Public videos" },
   { slug: "reddit-downloader", name: "Reddit", media: "Public videos" },
   { slug: "facebook-downloader", name: "Facebook", media: "Public videos" },

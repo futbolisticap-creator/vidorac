@@ -74,6 +74,10 @@ class GalleryTimeoutError(GalleryTemporaryError):
         super().__init__(f"{platform} gallery extraction timed out")
 
 
+class InstagramPostTemporarilyUnavailableError(GalleryTemporaryError):
+    """Instagram denied anonymous access to a photo or carousel post."""
+
+
 class GallerySourceBlockedError(GalleryAnalysisError):
     pass
 
@@ -200,8 +204,18 @@ def _public_preview_url(item_url: str, kind: str, metadata: dict[str, Any]) -> s
     return None
 
 
-def _map_gallery_exception(exc: Exception) -> GalleryAnalysisError:
+def _map_gallery_exception(exc: Exception, platform: str) -> GalleryAnalysisError:
     message = str(exc).lower()
+    if platform == "instagram" and any(
+        term in message
+        for term in (
+            "redirect to login page",
+            "redirect to home page",
+            "instagram.com/accounts/login",
+            "anonymous access",
+        )
+    ):
+        return InstagramPostTemporarilyUnavailableError()
     if any(term in message for term in ("429", "too many requests", "ip blocked", "blocked by network security")):
         return GallerySourceBlockedError()
     if any(term in message for term in ("timeout", "timed out", "temporarily", "502", "503", "504")):
@@ -236,11 +250,11 @@ def _extract_gallery_post_direct(raw_url: str, platform: str | None = None) -> G
             extraction_job.run()
     except Exception as exc:
         logger.warning("gallery-dl could not analyze %s: %s", url, exc)
-        raise _map_gallery_exception(exc) from exc
+        raise _map_gallery_exception(exc, platform) from exc
 
     if extraction_job.exception is not None:
         logger.warning("gallery-dl could not analyze %s: %s", url, extraction_job.exception)
-        raise _map_gallery_exception(extraction_job.exception)
+        raise _map_gallery_exception(extraction_job.exception, platform)
 
     items: list[GalleryItem] = []
     seen: set[str] = set()
@@ -344,6 +358,7 @@ _WORKER_ERRORS: dict[str, type[GalleryError]] = {
         GalleryAnalysisError,
         GalleryAuthenticationError,
         GalleryTemporaryError,
+        InstagramPostTemporarilyUnavailableError,
         GallerySourceBlockedError,
         GalleryContentUnavailableError,
         GalleryTooManyItemsError,
@@ -379,6 +394,8 @@ def _run_gallery_worker(url: str, platform: str) -> GalleryExtraction:
     except subprocess.TimeoutExpired as exc:
         _terminate_worker(process)
         logger.warning("gallery-dl analysis exceeded %s seconds for %s", GALLERY_ANALYSIS_TIMEOUT_SECONDS, platform)
+        if platform == "instagram" and urlsplit(url).path.startswith("/p/"):
+            raise InstagramPostTemporarilyUnavailableError from exc
         raise GalleryTimeoutError(platform) from exc
 
     if process.returncode != 0:
@@ -393,6 +410,11 @@ def _run_gallery_worker(url: str, platform: str) -> GalleryExtraction:
         error_type = _WORKER_ERRORS.get(payload.get("error") if isinstance(payload, dict) else "")
         if error_type is GalleryTooManyItemsError:
             raise GalleryTooManyItemsError
+        if error_type is InstagramPostTemporarilyUnavailableError:
+            logger.warning(
+                "gallery-dl classified an Instagram anonymous-login redirect (exit code %s)",
+                process.returncode,
+            )
         raise (error_type or GalleryAnalysisError)()
     return _deserialize_extraction(payload.get("extraction"), platform)
 

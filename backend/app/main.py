@@ -58,6 +58,7 @@ from .media_gallery import (
     GallerySourceBlockedError,
     GalleryTemporaryError,
     GalleryTimeoutError,
+    InstagramPostTemporarilyUnavailableError,
     GallerySizeLimitError,
     GalleryTooManyItemsError,
     download_gallery_post,
@@ -204,6 +205,14 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
             status_code=413,
             content={"success": False, "detail": "This post contains too many files."},
         )
+    except InstagramPostTemporarilyUnavailableError:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "success": False,
+                "detail": "Instagram photo and carousel posts are temporarily unavailable. Instagram is currently restricting anonymous access to some public posts. Reels are still supported.",
+            },
+        )
     except GalleryAuthenticationError:
         return JSONResponse(
             status_code=422,
@@ -318,6 +327,14 @@ def download_error_response(error: Exception, *, platform: str | None = None) ->
         return JSONResponse(
             status_code=422,
             content={"success": False, "detail": detail},
+        )
+    if isinstance(error, InstagramPostTemporarilyUnavailableError):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "success": False,
+                "detail": "Instagram photo and carousel posts are temporarily unavailable. Instagram is currently restricting anonymous access to some public posts. Reels are still supported.",
+            },
         )
     if isinstance(error, (NetworkTimeoutError, TemporaryUnavailableError, GalleryTemporaryError)):
         detail = (
