@@ -1,7 +1,7 @@
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
 yt-dlp[default,curl-cffi]==2026.8.19
-gallery-dl==1.32.11
+gallery-dl @ https://codeberg.org/mikf/gallery-dl/archive/d5f3379eb4b0e44d34fd8e628d944985a840a00a.tar.gz#sha256=ca20ad2a5055441f00cc636718e5868a17eea506e4056621b45642ee9bcd309b
 requests==2.34.2
 truststore==0.10.4
 python-multipart==0.0.32
