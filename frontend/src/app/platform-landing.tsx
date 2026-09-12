@@ -18,6 +18,10 @@ export default function PlatformLanding({ content }: { content: PlatformPageCont
   return (
     <main className="page-shell min-h-screen text-white">
       <section className="platform-hero mx-auto w-full max-w-[73.75rem] px-4 pb-12 pt-32 text-center sm:px-6 sm:pt-36 lg:px-8">
+        <Link className="platform-back-link" href="/#supported-sites">
+          <span aria-hidden="true">←</span>
+          <span>Back to supported sites</span>
+        </Link>
         <p className="section-label">{content.eyebrow}</p>
         <h1 className="mx-auto mt-4 w-full max-w-4xl text-balance text-[clamp(2.35rem,6vw,4rem)] font-semibold leading-[1.04] tracking-[-0.055em]">{content.h1}</h1>
         <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-7 text-[var(--text-muted)] sm:text-lg">{content.intro}</p>

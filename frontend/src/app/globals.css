@@ -398,6 +398,35 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .supported-sites-section { border-top: 1px solid var(--border-soft); }
 
+.platform-back-link {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: auto;
+  margin-bottom: 2rem;
+  color: #71c9ff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.platform-back-link:hover {
+  color: #a8e2ff;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+}
+
+.platform-back-link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
 .supported-sites-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
