@@ -909,6 +909,13 @@ button { -webkit-tap-highlight-color: transparent; }
   padding-top: 2.5rem !important;
 }
 
+.contact-direct-email {
+  margin-top: 1.15rem;
+  color: var(--text-faint) !important;
+  font-size: 0.78rem !important;
+  line-height: 1.5 !important;
+}
+
 .contact-form {
   display: grid;
   width: 100%;

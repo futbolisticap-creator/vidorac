@@ -7,11 +7,13 @@ export default function InformationPage({
   title,
   intro,
   children,
+  showRelatedLinks = true,
 }: {
   eyebrow: string;
   title: string;
   intro: string;
   children: ReactNode;
+  showRelatedLinks?: boolean;
 }) {
   return (
     <main className="information-page min-h-screen text-white">
@@ -22,11 +24,13 @@ export default function InformationPage({
           <p>{intro}</p>
         </header>
         <div className="information-content">{children}</div>
-        <nav className="information-links" aria-label="Related information">
-          <Link href="/contact">Contact</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-        </nav>
+        {showRelatedLinks ? (
+          <nav className="information-links" aria-label="Related information">
+            <Link href="/contact">Contact</Link>
+            <Link href="/privacy">Privacy</Link>
+            <Link href="/terms">Terms</Link>
+          </nav>
+        ) : null}
       </article>
       <SiteFooter />
     </main>
