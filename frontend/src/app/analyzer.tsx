@@ -107,8 +107,8 @@ function LinkIcon() {
   return <svg aria-hidden="true" className="size-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M10.6 13.4a4 4 0 0 0 5.7 0l2.1-2.1a4 4 0 0 0-5.7-5.7l-1.2 1.2m1.9 3.8a4 4 0 0 0-5.7 0l-2.1 2.1a4 4 0 0 0 5.7 5.7l1.2-1.2" /></svg>;
 }
 
-function SearchIcon() {
-  return <svg aria-hidden="true" className="size-[1.1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.9"><circle cx="11" cy="11" r="6.5" /><path strokeLinecap="round" d="m16 16 4 4" /></svg>;
+function SearchIcon({ className = "" }: { className?: string }) {
+  return <svg aria-hidden="true" className={`size-[1.1rem] ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.9"><circle cx="11" cy="11" r="6.5" /><path strokeLinecap="round" d="m16 16 4 4" /></svg>;
 }
 
 function MediaFallback({ video = false }: { video?: boolean }) {
@@ -440,6 +440,7 @@ export default function Analyzer() {
       : analysisWaitState === "timed-out"
         ? { title: "TikTok is taking too long to respond.", text: "Please try again in a moment." }
         : null;
+  const canRetryAnalysis = Boolean(error && retryUrl && !isAnalyzing);
 
   return (
     <div className="downloader-shell mt-8 w-full max-w-5xl text-left">
@@ -447,16 +448,24 @@ export default function Analyzer() {
         <div className={`analyzer-form rounded-xl border bg-[var(--surface)] p-2 sm:flex sm:min-h-[4.25rem] sm:items-center sm:gap-2 ${error ? "border-red-400/30" : "border-[var(--border)]"}`}>
           <label htmlFor="media-url" className="sr-only">Public TikTok URL</label>
           <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Paste a TikTok link..." className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label="Paste TikTok URL from clipboard">Paste</button></div>
-          <button type="submit" disabled={isAnalyzing} className="analyze-button flex w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--blue)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--blue-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 sm:min-h-[3.25rem] sm:w-auto">{isAnalyzing ? <span aria-hidden="true" className="analysis-wait-spinner !m-0 !size-[1.1rem] !border-white/25 !border-t-white" /> : <SearchIcon />}{isAnalyzing ? "Analyzing..." : "Analyze"}</button>
+          <button type="submit" disabled={isAnalyzing} data-analyzing={isAnalyzing} className="analyze-button flex w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--blue)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--blue-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 sm:min-h-[3.25rem] sm:w-auto">
+            <span className="relative size-[1.1rem] shrink-0" aria-hidden="true" data-testid="analyze-icon-slot">
+              <SearchIcon className={`absolute inset-0 transition-opacity ${isAnalyzing ? "invisible opacity-0" : "visible opacity-100"}`} />
+              <span data-testid="analyze-spinner" className={`analysis-wait-spinner absolute inset-0 !m-0 !size-[1.1rem] !border-white/25 !border-t-white transition-opacity ${isAnalyzing ? "visible opacity-100" : "invisible opacity-0"}`} />
+            </span>
+            <span data-testid="analyze-label">{isAnalyzing ? "Analyzing TikTok…" : "Analyze"}</span>
+          </button>
         </div>
         <div aria-live="polite" aria-atomic="true">
-          {waitCopy && <div id="analysis-status" className="analysis-wait-card" role="status">
-            {analysisWaitState !== "timed-out" && <><span aria-hidden="true" className="analysis-wait-spinner" /><span className="sr-only">Vidorac is still analyzing the link.</span></>}
-            <div><h2>{waitCopy.title}</h2><p>{waitCopy.text}</p></div>
-            {analysisWaitState === "timed-out" && <button type="button" onClick={retryAnalysis} className="analysis-retry-button">Try again</button>}
-          </div>}
-          {error ? <p id="analyze-error" className="error-message mt-3 text-sm">{error}</p> : null}
-          {IS_DEVELOPMENT && technicalError && error && <button type="button" onClick={copyTechnicalError} className="ml-2 mt-2 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65">{copiedError ? "Copied" : "Copy technical error"}</button>}
+          <div id="analysis-status" data-testid="analysis-status" className={`analysis-wait-card ${waitCopy ? "" : "hidden"}`} role="status" aria-hidden={!waitCopy}>
+            <span aria-hidden="true" className={`analysis-wait-spinner ${analysisWaitState === "timed-out" ? "invisible opacity-0" : "visible opacity-100"}`} />
+            <span className="sr-only">{waitCopy ? "Vidorac is still analyzing the link." : ""}</span>
+            <div><h2>{waitCopy?.title ?? ""}</h2><p>{waitCopy?.text ?? ""}</p></div>
+            <button type="button" onClick={retryAnalysis} disabled={analysisWaitState !== "timed-out"} className={`analysis-retry-button ${analysisWaitState === "timed-out" ? "" : "hidden"}`}>Try again</button>
+          </div>
+          <p id="analyze-error" className={`error-message mt-3 text-sm ${error ? "" : "hidden"}`} aria-hidden={!error}>{error ?? ""}</p>
+          <button type="button" data-testid="analyze-error-retry" onClick={retryAnalysis} disabled={!canRetryAnalysis} className={`analysis-retry-button mt-2 ${canRetryAnalysis ? "" : "hidden"}`}>Try again</button>
+          {IS_DEVELOPMENT && <button type="button" onClick={copyTechnicalError} disabled={!technicalError || !error} className={`ml-2 mt-2 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65 ${technicalError && error ? "" : "hidden"}`}>{copiedError ? "Copied" : "Copy technical error"}</button>}
         </div>
       </form>
 

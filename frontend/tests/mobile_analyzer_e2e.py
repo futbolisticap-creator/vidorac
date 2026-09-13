@@ -20,7 +20,7 @@ VIEWPORTS = (
     (
         "android-chrome-390",
         390,
-        844,
+        669,
         "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
     ),
@@ -31,7 +31,7 @@ VIEWPORTS = (
     (
         "safari-emulation-390",
         390,
-        844,
+        669,
         "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
     ),
@@ -263,9 +263,12 @@ def run_debug_failure_cases(browser) -> None:
 
 
 def run_abort_controller_rerender_case(browser) -> None:
-    context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    context = browser.new_context(viewport={"width": 390, "height": 669}, is_mobile=True, has_touch=True)
     page = context.new_page()
+    page_errors: list[str] = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.goto(TARGET_URL, wait_until="networkidle")
+    page.clock.install()
     page.evaluate(
         """
         () => {
@@ -285,15 +288,84 @@ def run_abort_controller_rerender_case(browser) -> None:
         }
         """ % json.dumps(VIDEO_RESPONSE)
     )
+    page.evaluate(
+        """
+        () => {
+          window.__stableAnalyzerNodes = {
+            button: document.querySelector('button[type="submit"]'),
+            iconSlot: document.querySelector('[data-testid="analyze-icon-slot"]'),
+            spinner: document.querySelector('[data-testid="analyze-spinner"]'),
+            label: document.querySelector('[data-testid="analyze-label"]'),
+            status: document.querySelector('[data-testid="analysis-status"]'),
+          };
+        }
+        """
+    )
+
+    def assert_stable_nodes() -> None:
+        assert page.evaluate(
+            """
+            () => {
+              const nodes = window.__stableAnalyzerNodes;
+              return nodes.button === document.querySelector('button[type="submit"]')
+                && nodes.iconSlot === document.querySelector('[data-testid="analyze-icon-slot"]')
+                && nodes.spinner === document.querySelector('[data-testid="analyze-spinner"]')
+                && nodes.label === document.querySelector('[data-testid="analyze-label"]')
+                && nodes.status === document.querySelector('[data-testid="analysis-status"]');
+            }
+            """
+        )
+
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
-    page.get_by_text("Analyzing...").wait_for()
+    page.get_by_text("Analyzing TikTok…", exact=True).wait_for()
+    assert_stable_nodes()
+    assert page.get_by_test_id("analyze-spinner").evaluate("element => getComputedStyle(element).visibility") == "visible"
+    page.clock.fast_forward(3_000)
+    page.get_by_role("heading", name="Analyzing TikTok…").wait_for()
+    assert_stable_nodes()
+    page.clock.fast_forward(12_000)
+    page.get_by_role("heading", name="Processing your TikTok link…").wait_for()
+    assert_stable_nodes()
     page.set_viewport_size({"width": 430, "height": 932})
     page.evaluate("window.dispatchEvent(new Event('resize'))")
     assert page.evaluate("window.__vidoracAnalyzeSignal.aborted") is False
     page.evaluate("window.__resolveVidoracAnalyze()")
     page.get_by_text("Mobile regression fixture").wait_for()
+    assert_stable_nodes()
     assert page.evaluate("window.__vidoracAnalyzeSignal.aborted") is False
+    assert not page_errors, page_errors
+    context.close()
+
+
+def run_immediate_failure_retry_case(browser) -> None:
+    context = browser.new_context(viewport={"width": 390, "height": 669}, is_mobile=True, has_touch=True)
+    page = context.new_page()
+    page_errors: list[str] = []
+    attempts = 0
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+
+    def analyze_route(route) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            route.abort("failed")
+        else:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE))
+
+    page.route("**/api/analyze", analyze_route)
+    page.goto(TARGET_URL, wait_until="networkidle")
+    page.fill("#media-url", TIKTOK_URL)
+    button = page.locator('button[type="submit"]')
+    button.evaluate("element => { window.__stableAnalyzeButton = element; }")
+    button.click()
+    page.get_by_text("We couldn't reach Vidorac's service. Please try again.", exact=True).wait_for()
+    assert button.evaluate("element => element === window.__stableAnalyzeButton")
+    page.get_by_test_id("analyze-error-retry").click()
+    page.get_by_text("Mobile regression fixture").wait_for()
+    assert button.evaluate("element => element === window.__stableAnalyzeButton")
+    assert attempts == 2
+    assert not page_errors, page_errors
     context.close()
 
 
@@ -314,9 +386,13 @@ with sync_playwright() as playwright:
                 print(run_viewport(browser, *viewport), flush=True)
     run_debug_failure_cases(browser)
     run_abort_controller_rerender_case(browser)
+    run_immediate_failure_retry_case(browser)
     print({"debug_failure_cases": "passed"}, flush=True)
     print({"abort_controller_rerender": "passed"}, flush=True)
+    print({"immediate_failure_retry": "passed"}, flush=True)
     browser.close()
     webkit = playwright.webkit.launch(headless=True)
-    print(run_viewport(webkit, "webkit-iphone-390", 390, 844, VIEWPORTS[-1][3]), flush=True)
+    print(run_viewport(webkit, "webkit-iphone-390x669", 390, 669, VIEWPORTS[-1][3]), flush=True)
+    run_abort_controller_rerender_case(webkit)
+    print({"webkit_loading_transitions": "passed"}, flush=True)
     webkit.close()
