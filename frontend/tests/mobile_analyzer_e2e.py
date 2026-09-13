@@ -369,13 +369,132 @@ def run_immediate_failure_retry_case(browser) -> None:
     context.close()
 
 
+def run_mp3_download_transition_matrix(browser) -> None:
+    context = browser.new_context(viewport={"width": 390, "height": 777}, is_mobile=True, has_touch=True, accept_downloads=True)
+    page = context.new_page()
+    page_errors: list[str] = []
+    prepare_bodies: list[dict] = []
+    native_download_requests: list[str] = []
+    fail_next_prepare = {"value": False}
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.on("request", lambda request: native_download_requests.append(request.url) if "/api/download/" in request.url and "/prepare" not in request.url else None)
+    page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE)))
+
+    def prepare_route(route) -> None:
+        prepare_bodies.append(route.request.post_data_json)
+        if fail_next_prepare["value"]:
+            fail_next_prepare["value"] = False
+            route.fulfill(status=500, content_type="application/json", body=json.dumps({"success": False, "detail": "Download could not be prepared."}))
+            return
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({"success": True, "download_id": f"test-{len(prepare_bodies)}", "filename": "test.mp3", "content_type": "audio/mpeg"}),
+        )
+
+    page.route("**/api/download/prepare", prepare_route)
+    page.route("**/api/download/test-*", lambda route: route.fulfill(status=200, content_type="audio/mpeg", headers={"Content-Disposition": "attachment; filename=test.mp3"}, body="test-audio"))
+    page.goto(f"{TARGET_URL.rstrip('/')}?debug=1", wait_until="networkidle")
+    page.clock.install()
+    page.fill("#media-url", TIKTOK_URL)
+    page.click("button[type=submit]")
+    page.get_by_role("heading", name="Mobile regression fixture").wait_for()
+
+    page.evaluate(
+        """
+        () => {
+          window.__stableMp3Nodes = {
+            card: document.querySelector('[data-testid="audio-card"]'),
+            selector: document.querySelector('[data-testid="mp3-bitrate-selector"]'),
+            button: document.querySelector('[data-testid="mp3-download-button"]'),
+            iconSlot: document.querySelector('[data-testid="mp3-action-icon-slot"]'),
+            spinner: document.querySelector('[data-testid="mp3-action-spinner"]'),
+            copy: document.querySelector('[data-testid="mp3-action-copy"]'),
+            label: document.querySelector('[data-testid="mp3-action-label"]'),
+            status: document.querySelector('[data-testid="mp3-status"]'),
+          };
+        }
+        """
+    )
+
+    def assert_mp3_nodes_stable() -> None:
+        assert page.evaluate(
+            """
+            () => {
+              const nodes = window.__stableMp3Nodes;
+              return nodes.card === document.querySelector('[data-testid="audio-card"]')
+                && nodes.selector === document.querySelector('[data-testid="mp3-bitrate-selector"]')
+                && nodes.button === document.querySelector('[data-testid="mp3-download-button"]')
+                && nodes.iconSlot === document.querySelector('[data-testid="mp3-action-icon-slot"]')
+                && nodes.spinner === document.querySelector('[data-testid="mp3-action-spinner"]')
+                && nodes.copy === document.querySelector('[data-testid="mp3-action-copy"]')
+                && nodes.label === document.querySelector('[data-testid="mp3-action-label"]')
+                && nodes.status === document.querySelector('[data-testid="mp3-status"]');
+            }
+            """
+        )
+
+    button = page.get_by_test_id("mp3-download-button")
+    label = page.get_by_test_id("mp3-action-label")
+    page.evaluate("() => { window.__nativeAnchorClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() {}; }")
+    button.click()
+    label.get_by_text("MP3 ready", exact=True).wait_for()
+    assert_mp3_nodes_stable()
+    page.clock.fast_forward(350)
+    label.get_by_text("Download started", exact=True).wait_for()
+    assert_mp3_nodes_stable()
+    assert not native_download_requests
+    page.clock.fast_forward(2_400)
+    label.get_by_text("Download MP3", exact=True).wait_for()
+    page.evaluate("() => { HTMLAnchorElement.prototype.click = window.__nativeAnchorClick; }")
+
+    for bitrate in (128, 192, 320):
+        page.get_by_role("button", name=f"{bitrate} kbps" + (" Small" if bitrate == 128 else " Recommended" if bitrate == 192 else " High")).click()
+        button.click()
+        label.get_by_text("MP3 ready", exact=True).wait_for()
+        assert_mp3_nodes_stable()
+        page.clock.fast_forward(350)
+        label.get_by_text("Download started", exact=True).wait_for()
+        assert_mp3_nodes_stable()
+        page.get_by_text("Vidorac Diagnostics", exact=True).locator("..").evaluate("element => { element.open = true; }")
+        page.get_by_text("Download stage: mp3-download-triggered", exact=False).wait_for()
+        page.clock.fast_forward(2_400)
+        label.get_by_text("Download MP3", exact=True).wait_for()
+        assert_mp3_nodes_stable()
+
+    assert [body["audio_bitrate"] for body in prepare_bodies[-3:]] == [128, 192, 320]
+    best_label = page.get_by_test_id("quality-best-label")
+    best_button = best_label.locator("xpath=../..").first
+    best_button.evaluate("element => { window.__stableBestButton = element; }")
+    best_button.click()
+    best_label.get_by_text("Download ready", exact=True).wait_for()
+    page.clock.fast_forward(350)
+    best_label.get_by_text("Download started", exact=True).wait_for()
+    assert best_button.evaluate("element => element === window.__stableBestButton")
+    assert prepare_bodies[-1]["quality"] == "best"
+
+    fail_next_prepare["value"] = True
+    button.click()
+    page.get_by_text("We couldn't prepare this MP3. Please try again.", exact=True).wait_for()
+    assert_mp3_nodes_stable()
+    button.click()
+    label.get_by_text("MP3 ready", exact=True).wait_for()
+    page.clock.fast_forward(350)
+    label.get_by_text("Download started", exact=True).wait_for()
+    assert_mp3_nodes_stable()
+    assert len(native_download_requests) == 5
+    assert not page_errors, page_errors
+    context.close()
+
+
 with sync_playwright() as playwright:
+    mp3_only = os.environ.get("VIDORAC_TEST_MP3_ONLY") == "1"
     executable = browser_executable()
     launch_options = {"headless": True}
     if executable:
         launch_options["executable_path"] = executable
     browser = playwright.chromium.launch(**launch_options)
-    if os.environ.get("VIDORAC_TEST_DEBUG_ONLY") != "1":
+    if not mp3_only and os.environ.get("VIDORAC_TEST_DEBUG_ONLY") != "1":
         requested_viewports = {
             item.strip()
             for item in os.environ.get("VIDORAC_TEST_VIEWPORTS", "").split(",")
@@ -384,15 +503,22 @@ with sync_playwright() as playwright:
         for viewport in VIEWPORTS:
             if not requested_viewports or viewport[0] in requested_viewports:
                 print(run_viewport(browser, *viewport), flush=True)
-    run_debug_failure_cases(browser)
-    run_abort_controller_rerender_case(browser)
-    run_immediate_failure_retry_case(browser)
-    print({"debug_failure_cases": "passed"}, flush=True)
-    print({"abort_controller_rerender": "passed"}, flush=True)
-    print({"immediate_failure_retry": "passed"}, flush=True)
+    if not mp3_only:
+        run_debug_failure_cases(browser)
+        run_abort_controller_rerender_case(browser)
+        run_immediate_failure_retry_case(browser)
+    run_mp3_download_transition_matrix(browser)
+    if not mp3_only:
+        print({"debug_failure_cases": "passed"}, flush=True)
+        print({"abort_controller_rerender": "passed"}, flush=True)
+        print({"immediate_failure_retry": "passed"}, flush=True)
+    print({"mp3_download_transition_matrix": "passed"}, flush=True)
     browser.close()
     webkit = playwright.webkit.launch(headless=True)
-    print(run_viewport(webkit, "webkit-iphone-390x669", 390, 669, VIEWPORTS[-1][3]), flush=True)
-    run_abort_controller_rerender_case(webkit)
-    print({"webkit_loading_transitions": "passed"}, flush=True)
+    if not mp3_only:
+        print(run_viewport(webkit, "webkit-iphone-390x669", 390, 669, VIEWPORTS[-1][3]), flush=True)
+        run_abort_controller_rerender_case(webkit)
+        print({"webkit_loading_transitions": "passed"}, flush=True)
+    run_mp3_download_transition_matrix(webkit)
+    print({"webkit_mp3_download_transitions": "passed"}, flush=True)
     webkit.close()

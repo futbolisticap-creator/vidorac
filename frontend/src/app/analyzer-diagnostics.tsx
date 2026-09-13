@@ -35,6 +35,8 @@ type CheckResult = "not attempted" | "success" | "failed";
 type DiagnosticState = {
   stage: AnalyzerStage;
   previousStage: string;
+  downloadStage: string;
+  previousDownloadStage: string;
   platform: string;
   urlType: string;
   requestId: string;
@@ -62,6 +64,7 @@ type DiagnosticState = {
 type DiagnosticContextValue = {
   enabled: boolean;
   setStage: (stage: AnalyzerStage) => void;
+  setDownloadStage: (stage: string) => void;
   setUrlContext: (platform: string, urlType: string) => void;
   beginRequest: (requestId: string, requestHost: string) => void;
   completeRequest: (status: number | string, durationMs: number, contentType?: string) => void;
@@ -74,10 +77,13 @@ type DiagnosticContextValue = {
 };
 
 const SESSION_STAGE_KEY = "vidorac_debug_stage";
+const SESSION_DOWNLOAD_STAGE_KEY = "vidorac_debug_download_stage";
 
 const initialState: DiagnosticState = {
   stage: "idle",
   previousStage: "none",
+  downloadStage: "idle",
+  previousDownloadStage: "none",
   platform: "not detected",
   urlType: "not detected",
   requestId: "not generated",
@@ -105,7 +111,11 @@ const initialState: DiagnosticState = {
 function getInitialState(): DiagnosticState {
   if (typeof window === "undefined") return initialState;
   try {
-    return { ...initialState, previousStage: sessionStorage.getItem(SESSION_STAGE_KEY) || "none" };
+    return {
+      ...initialState,
+      previousStage: sessionStorage.getItem(SESSION_STAGE_KEY) || "none",
+      previousDownloadStage: sessionStorage.getItem(SESSION_DOWNLOAD_STAGE_KEY) || "none",
+    };
   } catch {
     return initialState;
   }
@@ -116,6 +126,7 @@ const subscribeToLocation = () => noOp;
 const DiagnosticsContext = createContext<DiagnosticContextValue>({
   enabled: false,
   setStage: noOp,
+  setDownloadStage: noOp,
   setUrlContext: noOp,
   beginRequest: noOp,
   completeRequest: noOp,
@@ -150,6 +161,8 @@ function DiagnosticsPanel({ state, setState }: { state: DiagnosticState; setStat
     `URL type: ${state.urlType}`,
     `Analyzer stage: ${state.stage}`,
     `Last stage before reload: ${state.previousStage}`,
+    `Download stage: ${state.downloadStage}`,
+    `Last download stage before reload: ${state.previousDownloadStage}`,
     `Diagnostic request ID: ${state.requestId}`,
     `API request host: ${state.requestHost}`,
     `Analyze request started: ${state.requestStarted}`,
@@ -247,6 +260,16 @@ export function AnalyzerDiagnosticsProvider({ children }: { children: ReactNode 
   const setUrlContext = useCallback((platform: string, urlType: string) => {
     if (enabled) setState((current) => ({ ...current, platform, urlType }));
   }, [enabled]);
+  const setDownloadStage = useCallback((downloadStage: string) => {
+    if (!enabled) return;
+    const safeStage = sanitizeDiagnosticText(downloadStage, 120);
+    setState((current) => ({ ...current, downloadStage: safeStage }));
+    try {
+      sessionStorage.setItem(SESSION_DOWNLOAD_STAGE_KEY, safeStage);
+    } catch {
+      // Diagnostics must never break a download when storage is unavailable.
+    }
+  }, [enabled]);
   const beginRequest = useCallback((requestId: string, requestHost: string) => {
     if (enabled) setState((current) => ({
       ...current,
@@ -282,9 +305,16 @@ export function AnalyzerDiagnosticsProvider({ children }: { children: ReactNode 
   const captureError = useCallback((error: unknown, source = "analyzer", componentStack?: string) => {
     if (!enabled) return;
     const normalized = normalizeDiagnosticError(error);
+    let persistedDownloadStage = "idle";
+    try {
+      persistedDownloadStage = sessionStorage.getItem(SESSION_DOWNLOAD_STAGE_KEY) || "idle";
+    } catch {
+      // Fall back to the React state below.
+    }
     setState((current) => ({
       ...current,
-      stage: source === "react-analyzer-boundary" ? "render-failed" : current.stage,
+      stage: source === "react-analyzer-boundary" && persistedDownloadStage === "idle" && current.downloadStage === "idle" ? "render-failed" : current.stage,
+      downloadStage: source === "react-analyzer-boundary" && (persistedDownloadStage !== "idle" || current.downloadStage !== "idle") ? `${persistedDownloadStage !== "idle" ? persistedDownloadStage : current.downloadStage} → render-failed` : current.downloadStage,
       lastError: source,
       errorName: sanitizeDiagnosticText(normalized.name, 120),
       errorMessage: sanitizeDiagnosticText(normalized.message),
@@ -294,7 +324,9 @@ export function AnalyzerDiagnosticsProvider({ children }: { children: ReactNode 
     }));
     if (source === "react-analyzer-boundary") {
       try {
-        sessionStorage.setItem(SESSION_STAGE_KEY, "render-failed");
+        const downloadStage = sessionStorage.getItem(SESSION_DOWNLOAD_STAGE_KEY) || "idle";
+        if (downloadStage === "idle") sessionStorage.setItem(SESSION_STAGE_KEY, "render-failed");
+        else sessionStorage.setItem(SESSION_DOWNLOAD_STAGE_KEY, `${downloadStage} → render-failed`);
       } catch {
         // Diagnostics must not turn a render failure into another failure.
       }
@@ -303,12 +335,15 @@ export function AnalyzerDiagnosticsProvider({ children }: { children: ReactNode 
   const resetAttempt = useCallback(() => {
     if (!enabled) return;
     let previousStage = "none";
+    let previousDownloadStage = "none";
     try {
       previousStage = sessionStorage.getItem(SESSION_STAGE_KEY) || "none";
+      previousDownloadStage = sessionStorage.getItem(SESSION_DOWNLOAD_STAGE_KEY) || "none";
+      sessionStorage.setItem(SESSION_DOWNLOAD_STAGE_KEY, "idle");
     } catch {
       // Keep the safe fallback.
     }
-    setState({ ...initialState, previousStage });
+    setState({ ...initialState, previousStage, previousDownloadStage });
   }, [enabled]);
 
   useEffect(() => {
@@ -323,7 +358,7 @@ export function AnalyzerDiagnosticsProvider({ children }: { children: ReactNode 
     };
   }, [captureError, enabled]);
 
-  const value = useMemo(() => ({ enabled, setStage, setUrlContext, beginRequest, completeRequest, setResponseStatus, setResponseBody, setJsonParse, setSchemaValidation, captureError, resetAttempt }), [beginRequest, captureError, completeRequest, enabled, resetAttempt, setJsonParse, setResponseBody, setResponseStatus, setSchemaValidation, setStage, setUrlContext]);
+  const value = useMemo(() => ({ enabled, setStage, setDownloadStage, setUrlContext, beginRequest, completeRequest, setResponseStatus, setResponseBody, setJsonParse, setSchemaValidation, captureError, resetAttempt }), [beginRequest, captureError, completeRequest, enabled, resetAttempt, setDownloadStage, setJsonParse, setResponseBody, setResponseStatus, setSchemaValidation, setStage, setUrlContext]);
   return <DiagnosticsContext.Provider value={value}>{children}{enabled && <DiagnosticsPanel state={state} setState={setState} />}</DiagnosticsContext.Provider>;
 }
 
