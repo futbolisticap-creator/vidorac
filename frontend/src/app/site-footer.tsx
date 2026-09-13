@@ -18,9 +18,6 @@ export default function SiteFooter() {
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/tiktok-downloader">TikTok Downloader</Link>
-            <Link href="/tiktok-mp3-downloader">TikTok MP3</Link>
-            <Link href="/tiktok-slideshow-downloader">TikTok Slideshow</Link>
             <SupportButton label="Donate" variant="footer" />
           </nav>
         </div>

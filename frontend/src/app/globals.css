@@ -642,6 +642,29 @@ button { -webkit-tap-highlight-color: transparent; }
   line-height: 1.6;
 }
 
+.home-context-link {
+  display: inline-flex;
+  margin-top: 0.9rem;
+  color: #78ceff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.home-context-link:hover {
+  color: #bcecff;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.home-context-link:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
 .seo-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1198,6 +1221,7 @@ button { -webkit-tap-highlight-color: transparent; }
   .tool-card { animation: none; }
   .gallery-item,
   .header-link,
+  .home-context-link,
   .support-button,
   .contact-field input,
   .contact-field textarea,

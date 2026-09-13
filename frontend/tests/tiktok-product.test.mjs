@@ -45,15 +45,49 @@ test("audio result sends the selected bitrate without re-analysis", async () => 
   assert.match(source, /Higher bitrate creates a larger MP3 file/);
 });
 
-test("primary navigation omits MP3 while keeping the SEO page", async () => {
+test("primary navigation contains only Home, Contact and Donate", async () => {
   const header = await read("src/app/site-header.tsx");
-  const mp3Page = await read("src/app/tiktok-mp3-downloader/page.tsx");
 
-  assert.doesNotMatch(header, /href="\/tiktok-mp3-downloader"/);
-  assert.match(header, /href="\/tiktok-downloader"/);
+  assert.match(header, /href="\/"/);
   assert.match(header, /href="\/contact"/);
   assert.match(header, /<SupportButton \/>/);
-  assert.match(mp3Page, /TikTok MP3 Downloader/);
+  assert.doesNotMatch(header, /href="\/tiktok-downloader"/);
+  assert.doesNotMatch(header, /href="\/tiktok-mp3-downloader"/);
+  assert.doesNotMatch(header, /href="\/tiktok-slideshow-downloader"/);
+});
+
+test("footer keeps only legal, contact and donation navigation", async () => {
+  const footer = await read("src/app/site-footer.tsx");
+
+  for (const route of ["privacy", "terms", "contact"]) assert.match(footer, new RegExp(`href="/${route}"`));
+  assert.match(footer, /<SupportButton label="Donate" variant="footer" \/>/);
+  for (const route of ["tiktok-downloader", "tiktok-mp3-downloader", "tiktok-slideshow-downloader"]) {
+    assert.doesNotMatch(footer, new RegExp(`href="/${route}"`));
+  }
+});
+
+test("homepage links naturally to every TikTok SEO guide", async () => {
+  const home = await read("src/app/page.tsx");
+
+  for (const route of ["tiktok-downloader", "tiktok-mp3-downloader", "tiktok-slideshow-downloader"]) {
+    assert.match(home, new RegExp(`"/${route}"`));
+  }
+});
+
+test("TikTok SEO pages remain published and listed in sitemap", async () => {
+  const sitemap = await read("src/app/sitemap.ts");
+  const pages = [
+    ["tiktok-downloader", "TikTok Video, Slideshow & MP3 Downloader"],
+    ["tiktok-mp3-downloader", "TikTok MP3 Downloader"],
+    ["tiktok-slideshow-downloader", "TikTok Slideshow Downloader"],
+  ];
+
+  for (const [route, heading] of pages) {
+    const page = await read(`src/app/${route}/page.tsx`);
+    assert.match(page, new RegExp(heading));
+    assert.match(page, new RegExp(`slug: "${route}"`));
+    assert.match(sitemap, new RegExp(route));
+  }
 });
 
 test("legacy platform routes redirect and are absent from sitemap", async () => {

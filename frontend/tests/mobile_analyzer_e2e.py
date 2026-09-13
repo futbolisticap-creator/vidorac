@@ -102,6 +102,27 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.route("**/api/download/prepare", hold_prepare)
 
     page.goto(TARGET_URL, wait_until="networkidle")
+    header = page.locator("header.site-header")
+    footer = page.locator("footer.site-footer")
+    assert header.locator('a[href="/tiktok-downloader"]').count() == 0, f"{name}: TikTok guide remained in primary navigation"
+    for route in ("/tiktok-downloader", "/tiktok-mp3-downloader", "/tiktok-slideshow-downloader"):
+        assert footer.locator(f'a[href="{route}"]').count() == 0, f"{name}: {route} remained in footer navigation"
+    for route in ("/privacy", "/terms", "/contact"):
+        assert footer.locator(f'a[href="{route}"]').count() == 1, f"{name}: footer is missing {route}"
+
+    if width < 640:
+        mobile_nav = header.locator(".primary-nav-mobile")
+        mobile_nav.locator("summary").click()
+        assert mobile_nav.get_by_role("link", name="Home", exact=True).is_visible(), f"{name}: mobile Home link is hidden"
+        assert mobile_nav.get_by_role("link", name="Contact", exact=True).is_visible(), f"{name}: mobile Contact link is hidden"
+        assert mobile_nav.get_by_role("link", name="Donate to Vidorac", exact=False).is_visible(), f"{name}: mobile Donate link is hidden"
+        mobile_nav.locator("summary").click()
+    else:
+        desktop_nav = header.locator(".primary-nav-desktop")
+        assert desktop_nav.get_by_role("link", name="Home", exact=True).is_visible(), f"{name}: desktop Home link is hidden"
+        assert desktop_nav.get_by_role("link", name="Contact", exact=True).is_visible(), f"{name}: desktop Contact link is hidden"
+        assert desktop_nav.get_by_role("link", name="Donate to Vidorac", exact=False).is_visible(), f"{name}: desktop Donate link is hidden"
+
     assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")

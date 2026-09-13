@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Analyzer from "./analyzer";
 import AnalyzerBoundary from "./analyzer-boundary";
 import { AnalyzerDiagnosticsProvider } from "./analyzer-diagnostics";
@@ -11,9 +12,9 @@ const steps = [
 ];
 
 const features = [
-  ["Video downloads", "Download the real video qualities available for a public TikTok."],
-  ["MP3 audio", "Extract audio from supported TikTok videos and download it as MP3."],
-  ["Slideshows", "Download TikTok photo slideshows individually, as a selection or together."],
+  ["Video downloads", "Download the real video qualities available for a public TikTok.", "/tiktok-downloader", "TikTok video downloader guide"],
+  ["MP3 audio", "Extract audio from supported TikTok videos and download it as MP3.", "/tiktok-mp3-downloader", "Learn more about TikTok MP3 downloads"],
+  ["Slideshows", "Download TikTok photo slideshows individually, as a selection or together.", "/tiktok-slideshow-downloader", "Learn more about TikTok slideshows"],
 ];
 
 export default function Home() {
@@ -44,7 +45,7 @@ export default function Home() {
 
       <section aria-labelledby="features-title" className="seo-section seo-section-bordered">
         <p className="section-label">Built for TikTok</p><h2 id="features-title" className="seo-section-title">One focused downloader. Three useful formats.</h2>
-        <div className="seo-media-grid">{features.map(([title, text]) => <article key={title}><h3>{title}</h3><p>{text}</p></article>)}</div>
+        <div className="seo-media-grid">{features.map(([title, text, href, linkLabel]) => <article key={title}><h3>{title}</h3><p>{text}</p><Link className="home-context-link" href={href}>{linkLabel}<span aria-hidden="true"> →</span></Link></article>)}</div>
       </section>
 
       <section aria-labelledby="home-faq-title" className="seo-section seo-section-bordered">

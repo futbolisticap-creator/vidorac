@@ -13,7 +13,6 @@ export default function SiteHeader() {
 
         <div className="primary-nav-desktop ml-auto items-center gap-1 text-sm text-[var(--text-muted)]">
           <Link href="/" className="header-link header-home-link">Home</Link>
-          <Link href="/tiktok-downloader" className="header-link header-tiktok-link">TikTok Downloader</Link>
           <Link href="/contact" className="header-link header-contact-link">Contact</Link>
           <SupportButton />
         </div>
@@ -27,7 +26,6 @@ export default function SiteHeader() {
           </summary>
           <div className="mobile-nav-panel">
             <Link href="/" className="header-link">Home</Link>
-            <Link href="/tiktok-downloader" className="header-link">TikTok Downloader</Link>
             <Link href="/contact" className="header-link">Contact</Link>
             <SupportButton />
           </div>
