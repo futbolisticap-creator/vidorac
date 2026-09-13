@@ -88,7 +88,9 @@ test("support CTAs reuse the safe Ko-fi component with distinct copy", async () 
   assert.match(support, /target="_blank"/);
   assert.match(support, /rel="noopener noreferrer"/);
   assert.match(support, /data-event="donate_click"/);
-  assert.match(analyzer, /lastDownload && !anyPreparing \? <SupportCard \/> : null/);
+  assert.match(analyzer, /media && <>/);
+  assert.match(analyzer, /<\/section><ResultSupportCard \/><\/>/);
+  assert.doesNotMatch(analyzer, /lastDownload && !anyPreparing \? <ResultSupportCard/);
 });
 
 test("TikTok SEO pages remain published and listed in sitemap", async () => {

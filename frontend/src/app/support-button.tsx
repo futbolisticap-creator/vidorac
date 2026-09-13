@@ -38,11 +38,11 @@ export default function SupportButton({
   );
 }
 
-export function SupportCard() {
+export function ResultSupportCard() {
   if (!getSupportUrl()) return null;
 
   return (
-    <aside className="support-card" aria-labelledby="support-card-title" data-testid="post-download-support">
+    <aside className="support-card" aria-labelledby="support-card-title" data-testid="analyze-result-support">
       <div>
         <h3 id="support-card-title">Enjoying Vidorac?</h3>
         <p>

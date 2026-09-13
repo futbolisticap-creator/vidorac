@@ -102,7 +102,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.route("**/api/download/prepare", hold_prepare)
 
     page.goto(TARGET_URL, wait_until="networkidle")
-    assert page.get_by_test_id("post-download-support").count() == 0, f"{name}: post-download support appeared on initial load"
+    assert page.get_by_test_id("analyze-result-support").count() == 0, f"{name}: result support appeared on initial load"
     assert page.get_by_test_id("home-support-cta").count() == 1, f"{name}: homepage support CTA is missing"
     home_support_link = page.get_by_test_id("home-support-cta").locator("a")
     assert home_support_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
@@ -133,7 +133,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("Mobile regression fixture").wait_for()
-    assert page.get_by_test_id("post-download-support").count() == 0, f"{name}: post-download support appeared after Analyze only"
+    page.get_by_test_id("analyze-result-support").wait_for()
     page.get_by_role("button", name="Download MP3").wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
     assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
@@ -161,7 +161,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
         body=json.dumps({"success": False, "detail": "Download could not be prepared."}),
     )
     page.get_by_text("We couldn't prepare this MP3. Please try again.", exact=True).wait_for()
-    assert page.get_by_test_id("post-download-support").count() == 0, f"{name}: post-download support appeared after a failed download"
+    assert page.get_by_test_id("analyze-result-support").is_visible(), f"{name}: result support disappeared after a failed download"
     assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: failed preparation lost selected bitrate"
     assert not bitrate_320.is_disabled(), f"{name}: controls did not recover after preparation failure"
     console_errors.clear()  # The intentional HTTP 500 above is expected to reach the browser console.
@@ -222,9 +222,10 @@ def run_idle_state_case(browser) -> None:
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_role("heading", name="Mobile regression fixture").wait_for()
-    assert page.get_by_test_id("post-download-support").count() == 0
+    page.get_by_test_id("analyze-result-support").wait_for()
     page.fill("#media-url", "")
     assert page.get_by_role("heading", name="Mobile regression fixture").count() == 0
+    assert page.get_by_test_id("analyze-result-support").count() == 0
     assert page.get_by_text("Paste a TikTok link first.", exact=True).count() == 0
     assert_clean_idle()
     assert not page_errors, page_errors
@@ -258,6 +259,7 @@ def run_debug_failure_cases(browser) -> None:
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("We couldn't reach Vidorac's service. Please try again.", exact=True).wait_for()
+    assert page.get_by_test_id("analyze-result-support").count() == 0
     page.get_by_text("Analyzer stage: fetch-failed", exact=False).wait_for()
     page.get_by_text("Analyze request started: true", exact=False).wait_for()
     page.get_by_text("Analyze request completed: true", exact=False).wait_for()
@@ -387,6 +389,7 @@ def run_abort_controller_rerender_case(browser) -> None:
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("Analyzing TikTok…", exact=True).wait_for()
+    assert page.get_by_test_id("analyze-result-support").count() == 0
     assert_stable_nodes()
     assert page.get_by_test_id("analyze-spinner").evaluate("element => getComputedStyle(element).visibility") == "visible"
     page.clock.fast_forward(3_000)
@@ -400,8 +403,17 @@ def run_abort_controller_rerender_case(browser) -> None:
     assert page.evaluate("window.__vidoracAnalyzeSignal.aborted") is False
     page.evaluate("window.__resolveVidoracAnalyze()")
     page.get_by_text("Mobile regression fixture").wait_for()
+    page.get_by_test_id("analyze-result-support").wait_for()
     assert_stable_nodes()
     assert page.evaluate("window.__vidoracAnalyzeSignal.aborted") is False
+
+    page.fill("#media-url", "https://www.tiktok.com/@example/video/9876543210987654321")
+    page.click("button[type=submit]")
+    page.get_by_text("Analyzing TikTok…", exact=True).wait_for()
+    assert page.get_by_test_id("analyze-result-support").count() == 0
+    page.evaluate("window.__resolveVidoracAnalyze()")
+    page.get_by_text("Mobile regression fixture").wait_for()
+    page.get_by_test_id("analyze-result-support").wait_for()
     assert not page_errors, page_errors
     context.close()
 
@@ -467,6 +479,7 @@ def run_mp3_download_transition_matrix(browser) -> None:
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_role("heading", name="Mobile regression fixture").wait_for()
+    page.get_by_test_id("analyze-result-support").wait_for()
 
     page.evaluate(
         """
@@ -510,12 +523,12 @@ def run_mp3_download_transition_matrix(browser) -> None:
     assert_mp3_nodes_stable()
     page.clock.fast_forward(350)
     label.get_by_text("Download started", exact=True).wait_for()
-    post_download_support = page.get_by_test_id("post-download-support")
-    post_download_support.wait_for()
-    post_download_link = post_download_support.locator("a")
-    assert post_download_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
-    assert post_download_link.get_attribute("target") == "_blank"
-    assert post_download_link.get_attribute("rel") == "noopener noreferrer"
+    result_support = page.get_by_test_id("analyze-result-support")
+    result_support.wait_for()
+    result_support_link = result_support.locator("a")
+    assert result_support_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
+    assert result_support_link.get_attribute("target") == "_blank"
+    assert result_support_link.get_attribute("rel") == "noopener noreferrer"
     assert_mp3_nodes_stable()
     assert not native_download_requests
     page.clock.fast_forward(2_400)

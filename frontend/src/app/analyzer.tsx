@@ -23,7 +23,7 @@ import {
   MP3_BITRATE_OPTIONS,
   type Mp3Bitrate,
 } from "./mp3-options";
-import { SupportCard } from "./support-button";
+import { ResultSupportCard } from "./support-button";
 
 const IS_DEVELOPMENT = process.env.NODE_ENV === "development";
 const ANALYZE_TIMEOUT_MS = IS_DEVELOPMENT ? 60_000 : 120_000;
@@ -531,7 +531,7 @@ export default function Analyzer() {
         </div>
       </form>
 
-      {media && <section className="result-card mt-6 overflow-hidden rounded-xl border p-3 sm:p-5" aria-label={`Analyzed ${media.media_type}`}>
+      {media && <><section className="result-card mt-6 overflow-hidden rounded-xl border p-3 sm:p-5" aria-label={`Analyzed ${media.media_type}`}>
         <div className={`grid gap-5 ${isVideo || gallery?.media_type === "image" ? "md:grid-cols-[16rem_1fr] md:items-center" : ""}`}>
           {(isVideo || gallery?.media_type === "image") && <div className="relative aspect-video overflow-hidden rounded-xl border border-white/[0.07] bg-[#090b12]">{media.thumbnail && !failedPreviews.has(-1) ? <img src={media.thumbnail} alt={media.title ? `Preview for ${media.title}` : "Media preview"} className="size-full object-cover" referrerPolicy="no-referrer" onError={() => setFailedPreviews((current) => new Set(current).add(-1))} /> : <MediaFallback video={isVideo} />}</div>}
           <div className="min-w-0 px-1 py-1"><span className="inline-flex items-center gap-1.5 rounded-full border border-[#258cff]/20 bg-[#1682ff]/10 px-2.5 py-1 text-xs font-medium text-[#74cfff]"><span className="size-1.5 rounded-full bg-[#35c5ff]" />Analyzed</span><h2 className="mt-3 line-clamp-2 text-lg font-semibold leading-snug tracking-[-0.025em] text-white sm:text-xl">{media.title || (isVideo ? "Untitled video" : "Untitled post")}</h2><p className="mt-1 truncate text-sm text-white/45">{media.uploader || "Unknown creator"}</p><div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-white/60">{metadata.map((item, index) => <span key={`${String(item)}-${index}`} className="flex items-center gap-2">{index > 0 && <span className="size-1 rounded-full bg-white/20" />}{item}</span>)}</div></div>
@@ -556,11 +556,10 @@ export default function Analyzer() {
           </> : null}
           <div className="mt-3 min-h-5" aria-live="polite" aria-atomic="true"><p className={`text-xs text-red-300/90 ${downloadError ? "" : "hidden"}`}>{downloadError ?? ""}</p>{IS_DEVELOPMENT && <button type="button" onClick={copyTechnicalError} disabled={!technicalError || !downloadError} className={`mt-1 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65 ${technicalError && downloadError ? "" : "hidden"}`}>{copiedError ? "Copied" : "Copy technical error"}</button>}</div>
           <button type="button" disabled={!lastDownload || anyPreparing} onClick={() => { if (lastDownload) void prepareDownload(lastDownload.body, lastDownload.key); }} className={`mt-1 text-xs font-medium text-[#71c9ff]/75 underline decoration-[#71c9ff]/25 underline-offset-4 transition hover:text-[#9bdcff] ${lastDownload && !anyPreparing ? "" : "hidden"}`}>Download again</button>
-          {lastDownload && !anyPreparing ? <SupportCard /> : null}
           <p className="mt-2 text-xs leading-5 text-white/30">Only download content you own or have permission to use.</p>
           <button type="button" onClick={clearAnalyzer} disabled={anyPreparing} className="mt-4 rounded-lg border border-white/[0.09] bg-white/[0.025] px-3.5 py-2 text-sm font-medium text-white/55 transition hover:border-white/15 hover:bg-white/[0.055] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-not-allowed disabled:opacity-40">Download another</button>
         </div>
-      </section>}
+      </section><ResultSupportCard /></>}
     </div>
   );
 }
