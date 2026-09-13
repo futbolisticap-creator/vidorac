@@ -119,7 +119,7 @@ function StableDownloadAction({ label, loading, details, testId }: { label: stri
   return <>
     <span className="relative size-4 shrink-0" aria-hidden="true" data-testid={testId ? `${testId}-icon-slot` : undefined}>
       <DownloadIcon className={`absolute inset-0 transition-opacity ${loading ? "invisible opacity-0" : "visible opacity-100"}`} />
-      <span data-testid={testId ? `${testId}-spinner` : undefined} className={`absolute inset-0 size-4 animate-spin rounded-full border-2 border-current/25 border-t-current transition-opacity ${loading ? "visible opacity-100" : "invisible opacity-0"}`} />
+      <span data-testid={testId ? `${testId}-spinner` : undefined} data-active={loading} className={`absolute inset-0 size-4 animate-spin rounded-full border-2 border-current/25 border-t-current transition-opacity ${loading ? "visible opacity-100" : "invisible opacity-0"}`} />
     </span>
     <span className="flex min-w-0 flex-col gap-0.5" data-testid={testId ? `${testId}-copy` : undefined}>
       <span data-testid={testId ? `${testId}-label` : undefined}>{label}</span>
@@ -164,6 +164,21 @@ export default function Analyzer() {
     analysisTimers.current.forEach(clearTimeout);
     analysisRequestId.current += 1;
     analysisController.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      analysisTimers.current.forEach(clearTimeout);
+      analysisTimers.current = [];
+      analysisRequestId.current += 1;
+      analysisController.current?.abort();
+      analysisController.current = null;
+      setIsAnalyzing(false);
+      setAnalysisWaitState("idle");
+    };
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
   }, []);
 
   function clearAnalysisTimers() {
@@ -316,7 +331,7 @@ export default function Analyzer() {
     diagnostics.setStage("capability-check");
     if (decision.action === "invalid" || decision.action === "tiktok_only") {
       setMedia(null);
-      setError(decision.action === "invalid" ? "Invalid TikTok link." : "TikTok links only — Vidorac currently supports TikTok links on this website.");
+      setError(decision.action === "invalid" ? (url.trim() ? "Invalid TikTok link." : "Paste a TikTok link first.") : "TikTok links only — Vidorac currently supports TikTok links on this website.");
       setTechnicalError(null);
       setAnalyzedUrl(null);
       setDownloadError(null);
@@ -443,6 +458,22 @@ export default function Analyzer() {
     }
     if (result.text.trim()) { setUrl(result.text.trim()); setError(null); }
   }
+  function handleUrlChange(value: string) {
+    setUrl(value);
+    if (value.trim()) return;
+    setMedia(null);
+    setAnalyzedUrl(null);
+    setError(null);
+    setTechnicalError(null);
+    setDownloadError(null);
+    setDownloadPhases({});
+    setLastDownload(null);
+    setSelectedItems(new Set());
+    setFailedPreviews(new Set());
+    setAnalysisWaitState("idle");
+    setRetryUrl(null);
+    diagnostics.resetAttempt();
+  }
   function clearAnalyzer() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
@@ -462,7 +493,9 @@ export default function Analyzer() {
   const mp3Quality = isVideo ? media.quality_options.find((quality) => quality.id === "mp3" && quality.available) : undefined;
   const anyPreparing = Object.values(downloadPhases).includes("preparing");
   const metadata = media ? isVideo ? [displayPlatform(media.platform), formatDuration(media.duration), media.max_height ? `${media.max_height}p max` : null].filter(Boolean) : [displayPlatform(media.platform), media.media_type === "image" ? "1 image" : `${media.item_count} ${media.media_type === "gallery" ? "images" : "media items"}`] : [];
-  const waitCopy = analysisWaitState === "starting"
+  const waitCopy = analysisWaitState === "analyzing"
+    ? { title: "Starting analysis…", text: "Connecting securely to Vidorac's media service." }
+    : analysisWaitState === "starting"
     ? { title: "Analyzing TikTok…", text: "Checking the public post and its available video, images and audio." }
     : analysisWaitState === "taking-longer"
       ? { title: "Processing your TikTok link…", text: "TikTok may be responding slowly. Please keep this tab open." }
@@ -476,18 +509,18 @@ export default function Analyzer() {
       <form onSubmit={handleSubmit} noValidate className="mx-auto max-w-4xl">
         <div className={`analyzer-form rounded-xl border bg-[var(--surface)] p-2 sm:flex sm:min-h-[4.25rem] sm:items-center sm:gap-2 ${error ? "border-red-400/30" : "border-[var(--border)]"}`}>
           <label htmlFor="media-url" className="sr-only">Public TikTok URL</label>
-          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="Paste a TikTok link..." className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label="Paste TikTok URL from clipboard">Paste</button></div>
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => handleUrlChange(event.target.value)} placeholder="Paste a TikTok link..." className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label="Paste TikTok URL from clipboard">Paste</button></div>
           <button type="submit" disabled={isAnalyzing} data-analyzing={isAnalyzing} className="analyze-button flex w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--blue)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--blue-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 sm:min-h-[3.25rem] sm:w-auto">
             <span className="relative size-[1.1rem] shrink-0" aria-hidden="true" data-testid="analyze-icon-slot">
               <SearchIcon className={`absolute inset-0 transition-opacity ${isAnalyzing ? "invisible opacity-0" : "visible opacity-100"}`} />
-              <span data-testid="analyze-spinner" className={`analysis-wait-spinner absolute inset-0 !m-0 !size-[1.1rem] !border-white/25 !border-t-white transition-opacity ${isAnalyzing ? "visible opacity-100" : "invisible opacity-0"}`} />
+              <span data-testid="analyze-spinner" data-active={isAnalyzing} className={`analysis-wait-spinner absolute inset-0 !m-0 !size-[1.1rem] !border-white/25 !border-t-white transition-opacity ${isAnalyzing ? "visible opacity-100" : "invisible opacity-0"}`} />
             </span>
             <span data-testid="analyze-label">{isAnalyzing ? "Analyzing TikTok…" : "Analyze"}</span>
           </button>
         </div>
         <div aria-live="polite" aria-atomic="true">
-          <div id="analysis-status" data-testid="analysis-status" className={`analysis-wait-card ${waitCopy ? "" : "hidden"}`} role="status" aria-hidden={!waitCopy}>
-            <span aria-hidden="true" className={`analysis-wait-spinner ${analysisWaitState === "timed-out" ? "invisible opacity-0" : "visible opacity-100"}`} />
+          <div id="analysis-status" data-testid="analysis-status" data-active={Boolean(waitCopy)} className="analysis-wait-card" role="status" aria-hidden={!waitCopy}>
+            <span aria-hidden="true" data-active={Boolean(waitCopy) && analysisWaitState !== "timed-out"} className={`analysis-wait-spinner ${analysisWaitState === "timed-out" ? "invisible opacity-0" : "visible opacity-100"}`} />
             <span className="sr-only">{waitCopy ? "Vidorac is still analyzing the link." : ""}</span>
             <div><h2>{waitCopy?.title ?? ""}</h2><p>{waitCopy?.text ?? ""}</p></div>
             <button type="button" onClick={retryAnalysis} disabled={analysisWaitState !== "timed-out"} className={`analysis-retry-button ${analysisWaitState === "timed-out" ? "" : "hidden"}`}>Try again</button>

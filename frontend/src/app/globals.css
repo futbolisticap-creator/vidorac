@@ -287,6 +287,10 @@ button { -webkit-tap-highlight-color: transparent; }
   transition: border-color 180ms ease, background-color 180ms ease;
 }
 
+.analysis-wait-card[data-active="false"] {
+  display: none;
+}
+
 .analysis-wait-spinner {
   width: 1rem;
   height: 1rem;
@@ -296,6 +300,12 @@ button { -webkit-tap-highlight-color: transparent; }
   border-top-color: #68d3ff;
   border-radius: 999px;
   animation: analysis-spin 0.85s linear infinite;
+}
+
+.analysis-wait-spinner[data-active="false"] {
+  visibility: hidden;
+  opacity: 0;
+  animation: none;
 }
 
 .analysis-wait-card h2 {

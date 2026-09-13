@@ -163,6 +163,44 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     return result
 
 
+def run_idle_state_case(browser) -> None:
+    context = browser.new_context(viewport={"width": 390, "height": 777}, is_mobile=True, has_touch=True)
+    page = context.new_page()
+    page_errors: list[str] = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE)))
+    page.goto(TARGET_URL, wait_until="networkidle")
+
+    status = page.get_by_test_id("analysis-status")
+    analyze_spinner = page.get_by_test_id("analyze-spinner")
+    status_spinner = status.locator(".analysis-wait-spinner")
+
+    def assert_clean_idle() -> None:
+        assert status.evaluate("element => getComputedStyle(element).display") == "none"
+        assert analyze_spinner.evaluate("element => getComputedStyle(element).visibility") == "hidden"
+        assert analyze_spinner.evaluate("element => getComputedStyle(element).animationName") == "none"
+        assert status_spinner.evaluate("element => getComputedStyle(element).animationName") == "none"
+
+    assert_clean_idle()
+    page.click("button[type=submit]")
+    page.get_by_text("Paste a TikTok link first.", exact=True).wait_for()
+    assert_clean_idle()
+
+    page.reload(wait_until="networkidle")
+    assert page.input_value("#media-url") == ""
+    assert_clean_idle()
+
+    page.fill("#media-url", TIKTOK_URL)
+    page.click("button[type=submit]")
+    page.get_by_role("heading", name="Mobile regression fixture").wait_for()
+    page.fill("#media-url", "")
+    assert page.get_by_role("heading", name="Mobile regression fixture").count() == 0
+    assert page.get_by_text("Paste a TikTok link first.", exact=True).count() == 0
+    assert_clean_idle()
+    assert not page_errors, page_errors
+    context.close()
+
+
 def run_debug_failure_cases(browser) -> None:
     context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
     context.add_init_script(
@@ -504,6 +542,7 @@ with sync_playwright() as playwright:
             if not requested_viewports or viewport[0] in requested_viewports:
                 print(run_viewport(browser, *viewport), flush=True)
     if not mp3_only:
+        run_idle_state_case(browser)
         run_debug_failure_cases(browser)
         run_abort_controller_rerender_case(browser)
         run_immediate_failure_retry_case(browser)
@@ -517,6 +556,7 @@ with sync_playwright() as playwright:
     webkit = playwright.webkit.launch(headless=True)
     if not mp3_only:
         print(run_viewport(webkit, "webkit-iphone-390x669", 390, 669, VIEWPORTS[-1][3]), flush=True)
+        run_idle_state_case(webkit)
         run_abort_controller_rerender_case(webkit)
         print({"webkit_loading_transitions": "passed"}, flush=True)
     run_mp3_download_transition_matrix(webkit)
