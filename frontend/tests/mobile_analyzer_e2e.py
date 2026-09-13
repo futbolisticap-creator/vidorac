@@ -102,6 +102,12 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.route("**/api/download/prepare", hold_prepare)
 
     page.goto(TARGET_URL, wait_until="networkidle")
+    assert page.get_by_test_id("post-download-support").count() == 0, f"{name}: post-download support appeared on initial load"
+    assert page.get_by_test_id("home-support-cta").count() == 1, f"{name}: homepage support CTA is missing"
+    home_support_link = page.get_by_test_id("home-support-cta").locator("a")
+    assert home_support_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
+    assert home_support_link.get_attribute("target") == "_blank"
+    assert home_support_link.get_attribute("rel") == "noopener noreferrer"
     header = page.locator("header.site-header")
     footer = page.locator("footer.site-footer")
     assert header.locator('a[href="/tiktok-downloader"]').count() == 0, f"{name}: TikTok guide remained in primary navigation"
@@ -127,6 +133,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("Mobile regression fixture").wait_for()
+    assert page.get_by_test_id("post-download-support").count() == 0, f"{name}: post-download support appeared after Analyze only"
     page.get_by_role("button", name="Download MP3").wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
     assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
@@ -154,6 +161,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
         body=json.dumps({"success": False, "detail": "Download could not be prepared."}),
     )
     page.get_by_text("We couldn't prepare this MP3. Please try again.", exact=True).wait_for()
+    assert page.get_by_test_id("post-download-support").count() == 0, f"{name}: post-download support appeared after a failed download"
     assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: failed preparation lost selected bitrate"
     assert not bitrate_320.is_disabled(), f"{name}: controls did not recover after preparation failure"
     console_errors.clear()  # The intentional HTTP 500 above is expected to reach the browser console.
@@ -214,6 +222,7 @@ def run_idle_state_case(browser) -> None:
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_role("heading", name="Mobile regression fixture").wait_for()
+    assert page.get_by_test_id("post-download-support").count() == 0
     page.fill("#media-url", "")
     assert page.get_by_role("heading", name="Mobile regression fixture").count() == 0
     assert page.get_by_text("Paste a TikTok link first.", exact=True).count() == 0
@@ -501,6 +510,12 @@ def run_mp3_download_transition_matrix(browser) -> None:
     assert_mp3_nodes_stable()
     page.clock.fast_forward(350)
     label.get_by_text("Download started", exact=True).wait_for()
+    post_download_support = page.get_by_test_id("post-download-support")
+    post_download_support.wait_for()
+    post_download_link = post_download_support.locator("a")
+    assert post_download_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
+    assert post_download_link.get_attribute("target") == "_blank"
+    assert post_download_link.get_attribute("rel") == "noopener noreferrer"
     assert_mp3_nodes_stable()
     assert not native_download_requests
     page.clock.fast_forward(2_400)

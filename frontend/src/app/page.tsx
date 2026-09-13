@@ -4,6 +4,7 @@ import AnalyzerBoundary from "./analyzer-boundary";
 import { AnalyzerDiagnosticsProvider } from "./analyzer-diagnostics";
 import SiteFooter from "./site-footer";
 import { SITE_URL } from "./seo";
+import { HomepageSupportCard } from "./support-button";
 
 const steps = [
   ["01", "Copy the TikTok link", "Copy the link to a public TikTok video or slideshow."],
@@ -58,6 +59,7 @@ export default function Home() {
           <details><summary>Does Vidorac store downloads permanently?</summary><p>No. Prepared media uses temporary storage and is removed through the one-time download and automatic cleanup lifecycle.</p></details>
         </div>
       </section>
+      <HomepageSupportCard />
       <SiteFooter />
     </main>
   );

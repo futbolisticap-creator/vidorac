@@ -556,7 +556,7 @@ export default function Analyzer() {
           </> : null}
           <div className="mt-3 min-h-5" aria-live="polite" aria-atomic="true"><p className={`text-xs text-red-300/90 ${downloadError ? "" : "hidden"}`}>{downloadError ?? ""}</p>{IS_DEVELOPMENT && <button type="button" onClick={copyTechnicalError} disabled={!technicalError || !downloadError} className={`mt-1 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65 ${technicalError && downloadError ? "" : "hidden"}`}>{copiedError ? "Copied" : "Copy technical error"}</button>}</div>
           <button type="button" disabled={!lastDownload || anyPreparing} onClick={() => { if (lastDownload) void prepareDownload(lastDownload.body, lastDownload.key); }} className={`mt-1 text-xs font-medium text-[#71c9ff]/75 underline decoration-[#71c9ff]/25 underline-offset-4 transition hover:text-[#9bdcff] ${lastDownload && !anyPreparing ? "" : "hidden"}`}>Download again</button>
-          <div className={lastDownload && !anyPreparing ? "" : "hidden"} aria-hidden={!lastDownload || anyPreparing}><SupportCard /></div>
+          {lastDownload && !anyPreparing ? <SupportCard /> : null}
           <p className="mt-2 text-xs leading-5 text-white/30">Only download content you own or have permission to use.</p>
           <button type="button" onClick={clearAnalyzer} disabled={anyPreparing} className="mt-4 rounded-lg border border-white/[0.09] bg-white/[0.025] px-3.5 py-2 text-sm font-medium text-white/55 transition hover:border-white/15 hover:bg-white/[0.055] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-not-allowed disabled:opacity-40">Download another</button>
         </div>

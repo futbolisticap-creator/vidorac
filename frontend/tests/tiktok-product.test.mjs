@@ -74,6 +74,23 @@ test("homepage links naturally to every TikTok SEO guide", async () => {
   }
 });
 
+test("support CTAs reuse the safe Ko-fi component with distinct copy", async () => {
+  const home = await read("src/app/page.tsx");
+  const support = await read("src/app/support-button.tsx");
+  const analyzer = await read("src/app/analyzer.tsx");
+
+  assert.match(home, /<HomepageSupportCard \/>/);
+  assert.match(support, /Help Vidorac grow/);
+  assert.match(support, /Your support helps us improve the service/);
+  assert.match(support, /Enjoying Vidorac\?/);
+  assert.match(support, /project so we can keep improving speed, reliability and new features/);
+  assert.match(support, /<SupportButton label="Support Vidorac" variant="card" \/>/);
+  assert.match(support, /target="_blank"/);
+  assert.match(support, /rel="noopener noreferrer"/);
+  assert.match(support, /data-event="donate_click"/);
+  assert.match(analyzer, /lastDownload && !anyPreparing \? <SupportCard \/> : null/);
+});
+
 test("TikTok SEO pages remain published and listed in sitemap", async () => {
   const sitemap = await read("src/app/sitemap.ts");
   const pages = [

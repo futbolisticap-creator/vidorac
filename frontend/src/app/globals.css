@@ -739,6 +739,11 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .seo-donate-section > div { max-width: 42rem; }
 
+.home-support-section {
+  padding-block: clamp(2.75rem, 6vw, 4.25rem);
+  background: linear-gradient(135deg, rgba(22, 119, 242, 0.035), transparent 64%);
+}
+
 .related-platforms h2 { margin-top: 0; font-size: 1.15rem; letter-spacing: -0.02em; }
 
 .related-platforms > div {
