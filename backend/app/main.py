@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import threading
 from contextlib import asynccontextmanager
 from typing import Annotated, AsyncIterator
@@ -152,6 +153,14 @@ app.add_middleware(
 
 class AnalyzeRequest(BaseModel):
     url: str
+    diagnostic_request_id: str | None = None
+
+    @field_validator("diagnostic_request_id")
+    @classmethod
+    def validate_diagnostic_request_id(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"mobile-debug-[a-z0-9]+-[a-z0-9]{8}", value):
+            raise ValueError("Invalid diagnostic request id")
+        return value
 
 
 class DownloadRequest(BaseModel):
@@ -205,6 +214,10 @@ async def health_check() -> dict[str, str]:
 
 @app.post("/api/analyze", response_model=None)
 async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
+    if request.diagnostic_request_id:
+        logging.getLogger("vidorac.analyze").info(
+            "Analyze request received: %s", request.diagnostic_request_id
+        )
     try:
         _validated_url, platform = validate_and_classify_url(request.url)
         if platform not in PUBLIC_PLATFORMS:

@@ -3,7 +3,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { useAnalyzerDiagnostics } from "./analyzer-diagnostics";
 
-type Props = { children: ReactNode; onError: (error: unknown, source?: string) => void; onReset: () => void };
+type Props = { children: ReactNode; onError: (error: unknown, source?: string, componentStack?: string) => void; onReset: () => void };
 type State = { failed: boolean };
 
 class AnalyzerErrorBoundary extends Component<Props, State> {
@@ -14,7 +14,7 @@ class AnalyzerErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    this.props.onError(error, "react-analyzer-boundary");
+    this.props.onError(error, "react-analyzer-boundary", info.componentStack ?? undefined);
     if (process.env.NODE_ENV === "development") {
       console.error("Analyzer render failure", error, info.componentStack);
     }

@@ -13,6 +13,7 @@ import {
   type QualityOption,
 } from "./analyzer-client";
 import { useAnalyzerDiagnostics } from "./analyzer-diagnostics";
+import { createDiagnosticRequestId, responsePreview } from "./diagnostic-utils";
 import {
   describeUrlForDiagnostics,
   getAnalyzerUrlDecision,
@@ -137,6 +138,10 @@ export default function Analyzer() {
   const analysisController = useRef<AbortController | null>(null);
   const analysisRequestId = useRef(0);
 
+  useEffect(() => {
+    if (media) diagnostics.setStage("result-rendered");
+  }, [diagnostics, media]);
+
   useEffect(() => () => {
     timers.current.forEach(clearTimeout);
     analysisTimers.current.forEach(clearTimeout);
@@ -166,6 +171,9 @@ export default function Analyzer() {
 
     const controller = new AbortController();
     analysisController.current = controller;
+    const diagnosticRequestId = createDiagnosticRequestId();
+    const requestStartedAt = Date.now();
+    const requestHost = new URL(API_BASE_URL).host;
     let didTimeout = false;
 
     setIsAnalyzing(true);
@@ -181,7 +189,7 @@ export default function Analyzer() {
     setFailedPreviews(new Set());
     setDownloadPhases({});
     diagnostics.setStage("request-start");
-    diagnostics.markRequestStarted();
+    diagnostics.beginRequest(diagnosticRequestId, requestHost);
 
     analysisTimers.current = [
       setTimeout(() => {
@@ -195,51 +203,67 @@ export default function Analyzer() {
         didTimeout = true;
         setAnalysisWaitState("timed-out");
         setIsAnalyzing(false);
-        diagnostics.setResponseStatus("timeout");
+        diagnostics.completeRequest("timeout", Date.now() - requestStartedAt);
         diagnostics.captureError(new DOMException("Analysis timed out", "AbortError"), "analyze-timeout");
         controller.abort();
       }, ANALYZE_TIMEOUT_MS),
     ];
 
     try {
-      const request = fetch(`${API_BASE_URL}/api/analyze`, {
+      diagnostics.setStage("request-waiting");
+      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: requestedUrl }),
+        body: JSON.stringify({ url: requestedUrl, diagnostic_request_id: diagnosticRequestId }),
         signal: controller.signal,
       });
-      diagnostics.setStage("request-waiting");
-      const response = await request;
       if (analysisRequestId.current !== requestId) return;
-      diagnostics.setResponseStatus(response.status);
+      const contentType = response.headers.get("content-type") || "not reported";
+      diagnostics.completeRequest(response.status, Date.now() - requestStartedAt, contentType);
       clearAnalysisTimers();
       setAnalysisWaitState("idle");
 
-      diagnostics.setStage("response-parsing");
+      diagnostics.setStage("response-reading");
       let rawData: unknown;
+      let responseText: string;
       try {
-        const responseText = await response.text();
-        if (!responseText.trim()) throw new SyntaxError("Empty response body");
-        rawData = JSON.parse(responseText) as unknown;
-      } catch (parseError) {
+        responseText = await response.text();
+        diagnostics.setResponseBody(contentType, responsePreview(responseText));
+      } catch (readError) {
         setError("Vidorac received an invalid response from the service.");
-        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Invalid JSON response"));
-        diagnostics.captureError(parseError, "analyze-response-parsing");
+        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Response body could not be read"));
+        diagnostics.captureError(readError, "analyze-response-reading");
         return;
       }
+      diagnostics.setStage("json-parsing");
+      try {
+        if (!responseText.trim()) throw new SyntaxError("Empty response body");
+        rawData = JSON.parse(responseText) as unknown;
+        diagnostics.setJsonParse("success");
+      } catch (parseError) {
+        diagnostics.setJsonParse("failed");
+        setError("Vidorac received an invalid response from the service.");
+        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Invalid JSON response"));
+        diagnostics.captureError(parseError, "analyze-json-parsing");
+        return;
+      }
+      diagnostics.setStage("schema-validation");
       const data = normalizeAnalyzePayload(rawData);
+      if (data.kind === "invalid") {
+        diagnostics.setSchemaValidation("failed");
+        setError("Vidorac received an invalid response from the service.");
+        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Unexpected response schema"));
+        diagnostics.captureError(new TypeError("Unexpected analyze response schema"), "analyze-schema-validation");
+        return;
+      }
+      diagnostics.setSchemaValidation("success");
       if (!response.ok || data.kind === "error") {
+        diagnostics.setStage("http-error");
         const detail = data.kind === "error" ? data.detail : undefined;
         setError(publicAnalyzeError(detail));
         const backendTechnicalError = data.kind === "error" ? data.technicalError : undefined;
         setTechnicalError(backendTechnicalError ?? technicalMessage("POST /api/analyze", response.status, detail));
         diagnostics.captureError(new Error(detail ?? `HTTP ${response.status}`), "analyze-api-response");
-        return;
-      }
-      if (data.kind !== "success") {
-        setError("Vidorac received an invalid response from the service.");
-        setTechnicalError(technicalMessage("POST /api/analyze", response.status, "Unexpected response schema"));
-        diagnostics.captureError(new TypeError("Unexpected analyze response schema"), "analyze-schema-validation");
         return;
       }
       diagnostics.setStage("rendering-result");
@@ -248,6 +272,8 @@ export default function Analyzer() {
     } catch (requestError) {
       if (analysisRequestId.current !== requestId || didTimeout) return;
       clearAnalysisTimers();
+      diagnostics.setStage("fetch-failed");
+      diagnostics.completeRequest("no response", Date.now() - requestStartedAt);
       setAnalysisWaitState("idle");
       setError("We couldn't reach Vidorac's service. Please try again.");
       setTechnicalError(technicalMessage("POST /api/analyze", "NETWORK"));

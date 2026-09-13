@@ -17,6 +17,13 @@ UNSUPPORTED_URLS = (
 VIEWPORTS = (
     ("chrome-375", 375, 812, None),
     ("chrome-390", 390, 844, None),
+    (
+        "android-chrome-390",
+        390,
+        844,
+        "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+    ),
     ("chrome-393", 393, 852, None),
     ("chrome-430", 430, 932, None),
     ("tablet-768", 768, 1024, None),
@@ -77,12 +84,12 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page = context.new_page()
     page_errors: list[str] = []
     console_errors: list[str] = []
-    analyze_requests: list[str] = []
+    analyze_requests: list[dict] = []
     prepare_requests: list[dict] = []
     pending_prepare_routes = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
-    page.on("request", lambda request: analyze_requests.append(request.url) if "/api/analyze" in request.url else None)
+    page.on("request", lambda request: analyze_requests.append(request.post_data_json) if "/api/analyze" in request.url else None)
     page.route(
         "**/api/analyze",
         lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE)),
@@ -102,6 +109,8 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.get_by_role("button", name="Download MP3").wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
     assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
+    assert analyze_requests[0]["url"] == TIKTOK_URL
+    assert analyze_requests[0]["diagnostic_request_id"].startswith("mobile-debug-")
 
     bitrate_128 = page.get_by_role("button", name="128 kbps Small")
     bitrate_192 = page.get_by_role("button", name="192 kbps Recommended")
@@ -167,6 +176,11 @@ def run_debug_failure_cases(browser) -> None:
     page.get_by_text("Vidorac Diagnostics", exact=True).click()
     assert page.get_by_role("button", name="Copy diagnostic report").count() == 0
 
+    page.route("**/api/health", lambda route: route.fulfill(status=200, content_type="application/json", body='{"status":"ok"}'))
+    page.get_by_role("button", name="Check API").click()
+    page.get_by_text("Backend health reachable: YES", exact=False).wait_for()
+    page.get_by_text("Backend health status: 200", exact=False).wait_for()
+
     page.evaluate("setTimeout(() => { throw new Error('diagnostic-window-test'); }, 0)")
     page.get_by_text("Last error: window.onerror", exact=False).wait_for()
     page.evaluate("setTimeout(() => Promise.reject({ message: 'diagnostic-rejection-test' }), 0)")
@@ -176,6 +190,16 @@ def run_debug_failure_cases(browser) -> None:
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("We couldn't reach Vidorac's service. Please try again.", exact=True).wait_for()
+    page.get_by_text("Analyzer stage: fetch-failed", exact=False).wait_for()
+    page.get_by_text("Analyze request started: true", exact=False).wait_for()
+    page.get_by_text("Analyze request completed: true", exact=False).wait_for()
+    page.get_by_text("API response status: no response", exact=False).wait_for()
+    page.unroute("**/api/analyze")
+
+    page.route("**/api/analyze", lambda route: route.abort("accessdenied"))
+    page.click("button[type=submit]")
+    page.get_by_text("Last error: analyze-fetch", exact=False).wait_for()
+    page.get_by_text("Error message: Failed to fetch", exact=False).wait_for()
     page.unroute("**/api/analyze")
 
     page.route(
@@ -185,11 +209,23 @@ def run_debug_failure_cases(browser) -> None:
     page.click("button[type=submit]")
     page.get_by_text("This TikTok could not be accessed. It may be private, removed, or temporarily unavailable.", exact=True).wait_for()
     page.get_by_text("API response status: 503", exact=False).wait_for()
+    page.get_by_text("Analyzer stage: http-error", exact=False).wait_for()
+    page.get_by_text("JSON parse: success", exact=False).wait_for()
+    page.get_by_text("Schema validation: success", exact=False).wait_for()
     page.unroute("**/api/analyze")
 
-    page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="text/plain", body="not json"))
+    page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="text/html", body="<html><body>gateway error</body></html>"))
     page.click("button[type=submit]")
     page.get_by_text("Vidorac received an invalid response from the service.", exact=True).wait_for()
+    page.get_by_text("JSON parse: failed", exact=False).wait_for()
+    page.get_by_text("Response Content-Type: text/html", exact=False).wait_for()
+    page.get_by_text("Response preview: <html><body>gateway error</body></html>", exact=False).wait_for()
+    page.unroute("**/api/analyze")
+
+    page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="application/json", body=""))
+    page.click("button[type=submit]")
+    page.get_by_text("Response preview: [empty body]", exact=False).wait_for()
+    page.get_by_text("Error message: Empty response body", exact=False).wait_for()
     page.unroute("**/api/analyze")
 
     page.route(
@@ -199,12 +235,65 @@ def run_debug_failure_cases(browser) -> None:
     page.click("button[type=submit]")
     page.get_by_text("Vidorac received an invalid response from the service.", exact=True).wait_for()
     page.get_by_text("Last error: analyze-schema-validation", exact=False).wait_for()
+    page.get_by_text("Schema validation: failed", exact=False).wait_for()
+    page.unroute("**/api/analyze")
+
+    without_audio = json.loads(json.dumps(VIDEO_RESPONSE))
+    without_audio["video"]["quality_options"] = [without_audio["video"]["quality_options"][0]]
+    page.route(
+        "**/api/analyze",
+        lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(without_audio)),
+    )
+    page.click("button[type=submit]")
+    page.get_by_text("MP3 is not available for this TikTok.", exact=True).wait_for()
+    page.get_by_text("Analyzer stage: result-rendered", exact=False).wait_for()
 
     report = page.locator("details pre").inner_text()
-    assert "Analyzer stage: response-parsing" in report, report
-    assert "Last error: analyze-schema-validation" in report
+    assert "JSON parse: success" in report, report
+    assert "Schema validation: success" in report, report
+    assert "API request host:" in report
+    assert "Diagnostic request ID: mobile-debug-" in report
     assert TIKTOK_URL not in report
     assert page.get_by_text("Reload", exact=True).count() == 0
+
+    page.reload(wait_until="networkidle")
+    page.get_by_text("Vidorac Diagnostics", exact=True).click()
+    page.get_by_text("Last stage before reload: result-rendered", exact=False).wait_for()
+    context.close()
+
+
+def run_abort_controller_rerender_case(browser) -> None:
+    context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    page = context.new_page()
+    page.goto(TARGET_URL, wait_until="networkidle")
+    page.evaluate(
+        """
+        () => {
+          const originalFetch = window.fetch.bind(window);
+          window.fetch = (input, init = {}) => {
+            if (String(input).includes('/api/analyze')) {
+              window.__vidoracAnalyzeSignal = init.signal;
+              return new Promise((resolve) => {
+                window.__resolveVidoracAnalyze = () => resolve(new Response(
+                  JSON.stringify(%s),
+                  { status: 200, headers: { 'Content-Type': 'application/json' } }
+                ));
+              });
+            }
+            return originalFetch(input, init);
+          };
+        }
+        """ % json.dumps(VIDEO_RESPONSE)
+    )
+    page.fill("#media-url", TIKTOK_URL)
+    page.click("button[type=submit]")
+    page.get_by_text("Analyzing...").wait_for()
+    page.set_viewport_size({"width": 430, "height": 932})
+    page.evaluate("window.dispatchEvent(new Event('resize'))")
+    assert page.evaluate("window.__vidoracAnalyzeSignal.aborted") is False
+    page.evaluate("window.__resolveVidoracAnalyze()")
+    page.get_by_text("Mobile regression fixture").wait_for()
+    assert page.evaluate("window.__vidoracAnalyzeSignal.aborted") is False
     context.close()
 
 
@@ -224,5 +313,10 @@ with sync_playwright() as playwright:
             if not requested_viewports or viewport[0] in requested_viewports:
                 print(run_viewport(browser, *viewport), flush=True)
     run_debug_failure_cases(browser)
+    run_abort_controller_rerender_case(browser)
     print({"debug_failure_cases": "passed"}, flush=True)
+    print({"abort_controller_rerender": "passed"}, flush=True)
     browser.close()
+    webkit = playwright.webkit.launch(headless=True)
+    print(run_viewport(webkit, "webkit-iphone-390", 390, 844, VIEWPORTS[-1][3]), flush=True)
+    webkit.close()

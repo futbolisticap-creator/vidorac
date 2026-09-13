@@ -302,6 +302,27 @@ class UrlValidationTests(unittest.TestCase):
 
 
 class AnalyzeEndpointErrorTests(unittest.TestCase):
+    def test_diagnostic_request_id_is_validated_and_logged_without_media_url(self) -> None:
+        from pydantic import ValidationError
+        from app.main import AnalyzeRequest, analyze
+
+        media_url = "https://www.tiktok.com/@creator/video/123"
+        request = AnalyzeRequest(
+            url=media_url,
+            diagnostic_request_id="mobile-debug-abc12345-1234abcd",
+        )
+        with (
+            patch("app.main.PUBLIC_PLATFORMS", frozenset({"tiktok"})),
+            patch("app.main.analyze_content", return_value={"media_type": "video"}),
+            self.assertLogs("vidorac.analyze", level="INFO") as captured,
+        ):
+            asyncio.run(analyze(request))
+        self.assertIn("mobile-debug-abc12345-1234abcd", captured.output[0])
+        self.assertNotIn(media_url, captured.output[0])
+
+        with self.assertRaises(ValidationError):
+            AnalyzeRequest(url=media_url, diagnostic_request_id="unsafe request id")
+
     def test_tiktok_only_deployment_rejects_other_platform_before_extraction(self) -> None:
         from app.main import AnalyzeRequest, analyze
 
