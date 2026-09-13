@@ -1,40 +1,37 @@
+"use client";
+
+import { type MouseEvent } from "react";
+import { useDonationModal } from "./donation-modal";
+import { getSupportUrl } from "./support-config";
+
 type SupportButtonProps = {
   label?: string;
   variant?: "header" | "footer" | "card";
 };
-
-function getSupportUrl(): string | null {
-  const configuredUrl = process.env.NEXT_PUBLIC_SUPPORT_URL?.trim();
-  if (!configuredUrl) return null;
-
-  try {
-    const url = new URL(configuredUrl);
-    if (url.protocol !== "https:" || url.hostname !== "ko-fi.com") return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
 
 export default function SupportButton({
   label = "Donate",
   variant = "header",
 }: SupportButtonProps) {
   const supportUrl = getSupportUrl();
+  const { openDonationModal } = useDonationModal();
   if (!supportUrl) return null;
 
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    openDonationModal(event.currentTarget);
+  };
+
   return (
-    <a
-      href={supportUrl}
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
+      type="button"
+      onClick={handleClick}
       data-event="donate_click"
-      aria-label="Donate to Vidorac on Ko-fi (opens in a new tab)"
+      aria-label="Open the Vidorac donation panel"
       className={`support-button support-button-${variant}`}
     >
       <span aria-hidden="true" className="support-heart">♥</span>
       <span>{label}</span>
-    </a>
+    </button>
   );
 }
 

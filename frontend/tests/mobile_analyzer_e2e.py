@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -94,6 +95,10 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
         "**/api/analyze",
         lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE)),
     )
+    page.route(
+        re.compile(r"^https://ko-fi\.com/vidorac/"),
+        lambda route: route.fulfill(status=200, content_type="text/html", body="<html><body>Ko-fi test panel</body></html>"),
+    )
 
     def hold_prepare(route) -> None:
         prepare_requests.append(route.request.post_data_json)
@@ -102,12 +107,11 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.route("**/api/download/prepare", hold_prepare)
 
     page.goto(TARGET_URL, wait_until="networkidle")
+    assert page.locator("#kofiframe").count() == 0, f"{name}: Ko-fi iframe loaded before user intent"
     assert page.get_by_test_id("analyze-result-support").count() == 0, f"{name}: result support appeared on initial load"
     assert page.get_by_test_id("home-support-cta").count() == 1, f"{name}: homepage support CTA is missing"
-    home_support_link = page.get_by_test_id("home-support-cta").locator("a")
-    assert home_support_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
-    assert home_support_link.get_attribute("target") == "_blank"
-    assert home_support_link.get_attribute("rel") == "noopener noreferrer"
+    home_support_button = page.get_by_test_id("home-support-cta").get_by_role("button", name="Open the Vidorac donation panel")
+    assert home_support_button.is_visible()
     header = page.locator("header.site-header")
     footer = page.locator("footer.site-footer")
     assert header.locator('a[href="/tiktok-downloader"]').count() == 0, f"{name}: TikTok guide remained in primary navigation"
@@ -121,19 +125,57 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
         mobile_nav.locator("summary").click()
         assert mobile_nav.get_by_role("link", name="Home", exact=True).is_visible(), f"{name}: mobile Home link is hidden"
         assert mobile_nav.get_by_role("link", name="Contact", exact=True).is_visible(), f"{name}: mobile Contact link is hidden"
-        assert mobile_nav.get_by_role("link", name="Donate to Vidorac", exact=False).is_visible(), f"{name}: mobile Donate link is hidden"
+        donate_button = mobile_nav.get_by_role("button", name="Open the Vidorac donation panel")
+        assert donate_button.is_visible(), f"{name}: mobile Donate button is hidden"
+        donate_button.click()
+        dialog = page.get_by_role("dialog", name="Support Vidorac")
+        dialog.wait_for()
+        dialog.get_by_text("Loading Ko-fi...", exact=True).wait_for(state="detached")
+        assert page.evaluate("document.body.style.overflow") == "hidden"
+        iframe = dialog.locator("#kofiframe")
+        assert iframe.get_attribute("src") == "https://ko-fi.com/vidorac/?hidefeed=true&widget=true&embed=true&preview=true"
+        assert iframe.get_attribute("title") == "Support Vidorac on Ko-fi"
+        fallback = dialog.get_by_role("link", name="Open Ko-fi")
+        assert fallback.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
+        assert fallback.get_attribute("target") == "_blank"
+        assert fallback.get_attribute("rel") == "noopener noreferrer"
+        page.keyboard.press("Escape")
+        assert dialog.count() == 0
+        assert page.evaluate("document.body.style.overflow") == ""
+        assert donate_button.evaluate("element => document.activeElement === element"), f"{name}: focus was not restored to mobile Donate"
         mobile_nav.locator("summary").click()
     else:
         desktop_nav = header.locator(".primary-nav-desktop")
         assert desktop_nav.get_by_role("link", name="Home", exact=True).is_visible(), f"{name}: desktop Home link is hidden"
         assert desktop_nav.get_by_role("link", name="Contact", exact=True).is_visible(), f"{name}: desktop Contact link is hidden"
-        assert desktop_nav.get_by_role("link", name="Donate to Vidorac", exact=False).is_visible(), f"{name}: desktop Donate link is hidden"
+        donate_button = desktop_nav.get_by_role("button", name="Open the Vidorac donation panel")
+        assert donate_button.is_visible(), f"{name}: desktop Donate button is hidden"
+        donate_button.click()
+        dialog = page.get_by_role("dialog", name="Support Vidorac")
+        dialog.wait_for()
+        dialog.get_by_text("Loading Ko-fi...", exact=True).wait_for(state="detached")
+        assert page.evaluate("document.body.style.overflow") == "hidden"
+        assert dialog.locator("#kofiframe").get_attribute("src") == "https://ko-fi.com/vidorac/?hidefeed=true&widget=true&embed=true&preview=true"
+        fallback = dialog.get_by_role("link", name="Open Ko-fi")
+        fallback.focus()
+        page.keyboard.press("Tab")
+        assert dialog.get_by_role("button", name="Close donation panel").evaluate("element => document.activeElement === element"), f"{name}: modal focus trap failed"
+        dialog.get_by_role("button", name="Close donation panel").click()
+        assert dialog.count() == 0
+        assert donate_button.evaluate("element => document.activeElement === element"), f"{name}: focus was not restored to desktop Donate"
 
     assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
     page.get_by_text("Mobile regression fixture").wait_for()
     page.get_by_test_id("analyze-result-support").wait_for()
+    result_support_button = page.get_by_test_id("analyze-result-support").get_by_role("button", name="Open the Vidorac donation panel")
+    result_support_button.click()
+    result_dialog = page.get_by_role("dialog", name="Support Vidorac")
+    result_dialog.wait_for()
+    page.get_by_test_id("donation-modal-backdrop").click(position={"x": 3, "y": 3})
+    assert result_dialog.count() == 0, f"{name}: backdrop click did not close donation modal"
+    assert result_support_button.evaluate("element => document.activeElement === element"), f"{name}: result CTA focus was not restored"
     page.get_by_role("button", name="Download MP3").wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
     assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
@@ -228,6 +270,26 @@ def run_idle_state_case(browser) -> None:
     assert page.get_by_test_id("analyze-result-support").count() == 0
     assert page.get_by_text("Paste a TikTok link first.", exact=True).count() == 0
     assert_clean_idle()
+    assert not page_errors, page_errors
+    context.close()
+
+
+def run_donation_fallback_case(browser) -> None:
+    context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+    page = context.new_page()
+    page_errors: list[str] = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.route(re.compile(r"^https://ko-fi\.com/vidorac/"), lambda route: route.abort("failed"))
+    page.goto(TARGET_URL, wait_until="networkidle")
+    page.get_by_test_id("home-support-cta").get_by_role("button", name="Open the Vidorac donation panel").click()
+    dialog = page.get_by_role("dialog", name="Support Vidorac")
+    dialog.wait_for()
+    fallback = dialog.get_by_role("link", name="Open Ko-fi")
+    assert fallback.is_visible()
+    assert fallback.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
+    assert dialog.locator("#kofiframe").count() == 1
+    dialog.get_by_role("button", name="Close donation panel").click()
+    assert dialog.count() == 0
     assert not page_errors, page_errors
     context.close()
 
@@ -525,10 +587,8 @@ def run_mp3_download_transition_matrix(browser) -> None:
     label.get_by_text("Download started", exact=True).wait_for()
     result_support = page.get_by_test_id("analyze-result-support")
     result_support.wait_for()
-    result_support_link = result_support.locator("a")
-    assert result_support_link.get_attribute("href").rstrip("/") == "https://ko-fi.com/vidorac"
-    assert result_support_link.get_attribute("target") == "_blank"
-    assert result_support_link.get_attribute("rel") == "noopener noreferrer"
+    result_support_button = result_support.get_by_role("button", name="Open the Vidorac donation panel")
+    assert result_support_button.is_visible()
     assert_mp3_nodes_stable()
     assert not native_download_requests
     page.clock.fast_forward(2_400)
@@ -592,12 +652,14 @@ with sync_playwright() as playwright:
                 print(run_viewport(browser, *viewport), flush=True)
     if not mp3_only:
         run_idle_state_case(browser)
+        run_donation_fallback_case(browser)
         run_debug_failure_cases(browser)
         run_abort_controller_rerender_case(browser)
         run_immediate_failure_retry_case(browser)
     run_mp3_download_transition_matrix(browser)
     if not mp3_only:
         print({"debug_failure_cases": "passed"}, flush=True)
+        print({"donation_fallback": "passed"}, flush=True)
         print({"abort_controller_rerender": "passed"}, flush=True)
         print({"immediate_failure_retry": "passed"}, flush=True)
     print({"mp3_download_transition_matrix": "passed"}, flush=True)

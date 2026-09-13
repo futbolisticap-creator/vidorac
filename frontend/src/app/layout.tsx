@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SiteHeader from "./site-header";
+import { DonationProvider } from "./donation-modal";
+import { getSupportUrl } from "./support-config";
 import { OG_IMAGE_PATH, SITE_URL } from "./seo";
 
 const geistSans = Geist({
@@ -54,8 +56,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SiteHeader />
-        {children}
+        <DonationProvider supportUrl={getSupportUrl()}>
+          <SiteHeader />
+          {children}
+        </DonationProvider>
       </body>
     </html>
   );

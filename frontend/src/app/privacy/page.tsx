@@ -44,7 +44,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>Donations</h2>
-        <p>Vidorac does not directly process payment card information. Donations are handled on the external Ko-fi website and by the payment providers Ko-fi makes available, such as PayPal. Their own privacy policies apply when you leave Vidorac.</p>
+        <p>The donation interface is provided by Ko-fi and its payment providers. When you open or use the donation panel, those services may process information according to their own privacy policies. Vidorac does not directly process payment card information or payment credentials.</p>
         <a className="information-inline-link" href="https://ko-fi.com/vidorac" target="_blank" rel="noopener noreferrer">Visit Vidorac on Ko-fi</a>
       </section>
 

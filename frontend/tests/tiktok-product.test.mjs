@@ -77,6 +77,9 @@ test("homepage links naturally to every TikTok SEO guide", async () => {
 test("support CTAs reuse the safe Ko-fi component with distinct copy", async () => {
   const home = await read("src/app/page.tsx");
   const support = await read("src/app/support-button.tsx");
+  const modal = await read("src/app/donation-modal.tsx");
+  const layout = await read("src/app/layout.tsx");
+  const privacy = await read("src/app/privacy/page.tsx");
   const analyzer = await read("src/app/analyzer.tsx");
 
   assert.match(home, /<HomepageSupportCard \/>/);
@@ -85,9 +88,19 @@ test("support CTAs reuse the safe Ko-fi component with distinct copy", async () 
   assert.match(support, /Enjoying Vidorac\?/);
   assert.match(support, /project so we can keep improving speed, reliability and new features/);
   assert.match(support, /<SupportButton label="Support Vidorac" variant="card" \/>/);
-  assert.match(support, /target="_blank"/);
-  assert.match(support, /rel="noopener noreferrer"/);
   assert.match(support, /data-event="donate_click"/);
+  assert.match(support, /openDonationModal\(event\.currentTarget\)/);
+  assert.match(layout, /<DonationProvider supportUrl=\{getSupportUrl\(\)\}>/);
+  assert.match(modal, /role="dialog"/);
+  assert.match(modal, /aria-modal="true"/);
+  assert.match(modal, /Support Vidorac on Ko-fi/);
+  assert.match(modal, /hidefeed=true&widget=true&embed=true&preview=true/);
+  assert.match(modal, /Loading Ko-fi\.\.\./);
+  assert.match(modal, /target="_blank"/);
+  assert.match(modal, /rel="noopener noreferrer"/);
+  assert.doesNotMatch(modal, /dangerouslySetInnerHTML/);
+  assert.match(privacy, /When you open or use the donation panel/);
+  assert.match(privacy, /does not directly process payment card information or payment credentials/);
   assert.match(analyzer, /media && <>/);
   assert.match(analyzer, /<\/section><ResultSupportCard \/><\/>/);
   assert.doesNotMatch(analyzer, /lastDownload && !anyPreparing \? <ResultSupportCard/);
