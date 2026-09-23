@@ -7,7 +7,7 @@ LOCAL_FRONTEND_ORIGINS = (
     "http://127.0.0.1:3000",
 )
 SUPPORTED_PUBLIC_PLATFORMS = frozenset(
-    {"youtube", "tiktok", "instagram", "x", "reddit", "facebook"}
+    {"tiktok", "instagram", "x", "reddit", "facebook"}
 )
 
 

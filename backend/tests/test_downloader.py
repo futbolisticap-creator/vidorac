@@ -33,18 +33,19 @@ class QualityValidationTests(unittest.TestCase):
     def test_accepts_every_supported_quality(self) -> None:
         for quality in ("best", "compatible", "1080", "720", "480", "mp3"):
             with self.subTest(quality=quality):
-                request = DownloadRequest(url="https://youtu.be/test", quality=quality)
+                request = DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality=quality)
                 self.assertEqual(request.quality.value, quality)
 
     def test_rejects_arbitrary_quality(self) -> None:
         with self.assertRaises(ValidationError):
-            DownloadRequest(url="https://youtu.be/test", quality="4k")
+            DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality="4k")
 
     def test_accepts_only_supported_mp3_bitrates(self) -> None:
         for bitrate in (128, 192, 320):
             with self.subTest(bitrate=bitrate):
                 request = DownloadRequest(
                     url="https://www.tiktok.com/@creator/video/123",
+                    platform="tiktok",
                     quality="mp3",
                     audio_bitrate=bitrate,
                 )
@@ -53,6 +54,7 @@ class QualityValidationTests(unittest.TestCase):
     def test_mp3_bitrate_defaults_to_192(self) -> None:
         request = DownloadRequest(
             url="https://www.tiktok.com/@creator/video/123",
+            platform="tiktok",
             quality="mp3",
         )
         self.assertEqual(request.audio_bitrate, DEFAULT_MP3_BITRATE)
@@ -62,6 +64,7 @@ class QualityValidationTests(unittest.TestCase):
             with self.subTest(bitrate=bitrate), self.assertRaises(ValidationError):
                 DownloadRequest(
                     url="https://www.tiktok.com/@creator/video/123",
+                    platform="tiktok",
                     quality="mp3",
                     audio_bitrate=bitrate,
                 )
@@ -70,6 +73,7 @@ class QualityValidationTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             DownloadRequest(
                 url="https://www.tiktok.com/@creator/video/123",
+                platform="tiktok",
                 quality="best",
                 audio_bitrate=192,
             )
@@ -77,7 +81,7 @@ class QualityValidationTests(unittest.TestCase):
     def test_gallery_indices_require_real_integers(self) -> None:
         for invalid in ([-1.5], ["1"], [True]):
             with self.subTest(invalid=invalid), self.assertRaises(ValidationError):
-                DownloadRequest(url="https://www.instagram.com/p/test/", item_indices=invalid)
+                DownloadRequest(url="https://www.instagram.com/p/test/", platform="instagram", item_indices=invalid)
 
 
 class DownloadValidationTests(unittest.TestCase):

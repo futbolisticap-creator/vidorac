@@ -1,8 +1,12 @@
 /youtube-downloader / 301
-/instagram-downloader / 301
-/x-downloader / 301
-/reddit-downloader / 301
-/facebook-downloader / 301
+/tiktok-downloader /tiktok 301
+/tiktok-mp3-downloader /tiktok 301
+/tiktok-slideshow-downloader /tiktok 301
+/instagram-downloader /instagram 301
+/x-downloader /x 301
+/twitter /x 301
+/reddit-downloader /reddit 301
+/facebook-downloader /facebook 301
 /tools/compress / 301
 /tools/convert / 301
 /tools/trim / 301

@@ -4,7 +4,7 @@ import os
 import re
 import threading
 from contextlib import asynccontextmanager
-from typing import Annotated, AsyncIterator
+from typing import Annotated, AsyncIterator, Literal
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -151,8 +151,12 @@ app.add_middleware(
 )
 
 
+PublicPlatform = Literal["tiktok", "instagram", "facebook", "reddit", "x"]
+
+
 class AnalyzeRequest(BaseModel):
     url: str
+    platform: PublicPlatform
     diagnostic_request_id: str | None = None
 
     @field_validator("diagnostic_request_id")
@@ -165,6 +169,7 @@ class AnalyzeRequest(BaseModel):
 
 class DownloadRequest(BaseModel):
     url: str
+    platform: PublicPlatform
     quality: DownloadQuality | None = None
     audio_bitrate: Mp3Bitrate | None = None
     item_indices: list[StrictInt] | None = None
@@ -212,6 +217,29 @@ async def health_check() -> dict[str, str]:
     return {"status": "ok"}
 
 
+PLATFORM_LABELS: dict[str, str] = {
+    "tiktok": "TikTok",
+    "instagram": "Instagram",
+    "facebook": "Facebook",
+    "reddit": "Reddit",
+    "x": "X / Twitter",
+}
+
+
+def platform_mismatch_response(expected: str, actual: str) -> JSONResponse:
+    actual_label = PLATFORM_LABELS.get(actual, "another platform")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "success": False,
+            "detail": f"This {actual_label} URL does not match this downloader. Please use the {actual_label} Downloader.",
+            "error_code": "wrong_platform",
+            "expected_platform": expected,
+            "detected_platform": actual,
+        },
+    )
+
+
 @app.post("/api/analyze", response_model=None)
 async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
     if request.diagnostic_request_id:
@@ -223,8 +251,10 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
         if platform not in PUBLIC_PLATFORMS:
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "detail": "TikTok links only. Vidorac currently supports TikTok links on this website."},
+                content={"success": False, "detail": "This platform is not available on Vidorac."},
             )
+        if platform != request.platform:
+            return platform_mismatch_response(request.platform, platform)
         media = await asyncio.to_thread(analyze_content, request.url)
     except InvalidUrlError:
         return JSONResponse(
@@ -241,7 +271,7 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
             status_code=400,
             content={
                 "success": False,
-                "detail": "Unsupported URL. Vidorac currently supports TikTok links on this website.",
+                "detail": "Unsupported URL. Use a TikTok, Instagram, Facebook, Reddit or X link.",
             },
         )
     except GalleryTooManyItemsError:
@@ -347,7 +377,7 @@ def download_error_response(error: Exception, *, platform: str | None = None) ->
             status_code=400,
             content={
                 "success": False,
-                "detail": "Unsupported URL. Vidorac currently supports TikTok links on this website.",
+                "detail": "Unsupported URL. Use a TikTok, Instagram, Facebook, Reddit or X link.",
             },
         )
     if isinstance(error, FFmpegRequiredError):
@@ -563,8 +593,10 @@ async def prepare_download(
         if platform not in PUBLIC_PLATFORMS:
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "detail": "TikTok links only. Vidorac currently supports TikTok links on this website."},
+                content={"success": False, "detail": "This platform is not available on Vidorac."},
             )
+        if platform != request.platform:
+            return platform_mismatch_response(request.platform, platform)
         if request.quality is None:
             artifact = await asyncio.to_thread(
                 run_heavy_job,

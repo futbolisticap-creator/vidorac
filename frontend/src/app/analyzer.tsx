@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- public preview hosts are dynamic extractor metadata */
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { API_BASE_URL } from "./api-config";
 import {
   CLIPBOARD_UNAVAILABLE_MESSAGE,
@@ -17,6 +18,9 @@ import { createDiagnosticRequestId, responsePreview } from "./diagnostic-utils";
 import {
   describeUrlForDiagnostics,
   getAnalyzerUrlDecision,
+  platformNames,
+  platformPaths,
+  type PlatformId,
 } from "./platform-status";
 import {
   DEFAULT_MP3_BITRATE,
@@ -36,7 +40,7 @@ type AnalysisWaitState =
   | "timed-out";
 
 type DownloadPhase = "preparing" | "ready" | "started";
-type DownloadBody = { url: string; quality?: QualityOption["id"]; audio_bitrate?: Mp3Bitrate; item_indices?: number[]; archive?: boolean };
+type DownloadBody = { url: string; platform: PlatformId; quality?: QualityOption["id"]; audio_bitrate?: Mp3Bitrate; item_indices?: number[]; archive?: boolean };
 type LastDownload = { key: string; body: DownloadBody };
 
 function formatDuration(duration: number | null): string | null {
@@ -50,7 +54,6 @@ function formatDuration(duration: number | null): string | null {
 
 function displayPlatform(platform: MediaMetadata["platform"]): string {
   const names: Record<MediaMetadata["platform"], string> = {
-    youtube: "YouTube",
     tiktok: "TikTok",
     instagram: "Instagram",
     x: "X",
@@ -66,21 +69,24 @@ function formatEstimatedSize(bytes: number | null): string | null {
   return `~${megabytes >= 10 ? Math.round(megabytes) : megabytes.toFixed(1)} MB`;
 }
 
-function publicAnalyzeError(detail?: string): string {
-  if (detail === "Invalid URL.") return "Invalid TikTok link.";
-  if (detail?.startsWith("TikTok temporarily") || detail?.startsWith("This TikTok")) return detail;
-  if (detail?.startsWith("Unsupported URL.")) return "Vidorac currently supports TikTok links on this website.";
-  if (detail?.includes("individual posts")) return "Paste a link to one public TikTok video or slideshow, not a profile or feed.";
+function publicAnalyzeError(platform: PlatformId, detail?: string): string {
+  const name = platformNames[platform];
+  if (detail === "Invalid URL.") return `Invalid ${name} link.`;
+  if (detail?.includes("does not match this downloader")) return detail;
+  if (detail?.startsWith("Unsupported URL.")) return `Paste a supported ${name} link.`;
+  if (detail?.includes("individual posts")) return `Paste a link to one public ${name} post, not a profile or feed.`;
   if (detail?.includes("too many")) return "This post contains too many files.";
-  if (detail?.includes("authentication")) return "This TikTok isn't publicly accessible.";
-  return "This TikTok could not be accessed. It may be private, removed, or temporarily unavailable.";
+  if (detail?.includes("authentication") || detail?.includes("publicly accessible")) return `This ${name} post isn't publicly accessible.`;
+  if (detail) return detail;
+  return `This ${name} post could not be accessed. It may be private, removed, or temporarily unavailable.`;
 }
 
-function publicDownloadError(detail?: string): string {
+function publicDownloadError(platform: PlatformId, detail?: string): string {
+  const name = platformNames[platform];
   if (!detail) return "We couldn't prepare this download. Please try again.";
-  if (detail.startsWith("TikTok temporarily") || detail.startsWith("This TikTok")) return detail;
-  if (detail.includes("temporarily")) return "TikTok temporarily rejected the request. Please try again later.";
-  if (detail.includes("authentication")) return "This TikTok isn't publicly accessible.";
+  if (detail.includes("does not match this downloader")) return detail;
+  if (detail.includes("temporarily")) return `${name} temporarily rejected the request. Please try again later.`;
+  if (detail.includes("authentication") || detail.includes("publicly accessible")) return `This ${name} post isn't publicly accessible.`;
   if (detail.includes("selected media")) return "That item is no longer available in this post. Analyze it again.";
   if (detail.includes("not available")) return "This media is no longer available.";
   if (detail.includes("format")) return "This format is not available for this video.";
@@ -91,7 +97,7 @@ function publicDownloadError(detail?: string): string {
 }
 
 function downloadPreparationError(body: DownloadBody, detail?: string): string {
-  const message = publicDownloadError(detail);
+  const message = publicDownloadError(body.platform, detail);
   if (body.quality === "mp3" && message === "We couldn't prepare this download. Please try again.") {
     return "We couldn't prepare this MP3. Please try again.";
   }
@@ -132,7 +138,7 @@ function MediaFallback({ video = false }: { video?: boolean }) {
   return <div className="flex size-full items-center justify-center bg-[radial-gradient(circle_at_50%_45%,rgba(31,132,255,0.16),transparent_65%)] text-[#42c7ff]">{video ? <svg aria-hidden="true" className="size-10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.8v12.4a1 1 0 0 0 1.5.86l9.3-6.2a1 1 0 0 0 0-1.72l-9.3-6.2A1 1 0 0 0 8 5.8Z" /></svg> : <svg aria-hidden="true" className="size-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3.5" y="4" width="17" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="m5 17 4-4 3 3 2-2 5 4"/></svg>}</div>;
 }
 
-export default function Analyzer() {
+export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "Paste a TikTok link..." }: { expectedPlatform?: PlatformId; placeholder?: string }) {
   const diagnostics = useAnalyzerDiagnostics();
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -149,6 +155,7 @@ export default function Analyzer() {
   const [failedPreviews, setFailedPreviews] = useState<Set<number>>(new Set());
   const [analysisWaitState, setAnalysisWaitState] = useState<AnalysisWaitState>("idle");
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
+  const [suggestedPlatform, setSuggestedPlatform] = useState<PlatformId | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const analysisTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -220,6 +227,7 @@ export default function Analyzer() {
     setSelectedItems(new Set());
     setFailedPreviews(new Set());
     setDownloadPhases({});
+    setSuggestedPlatform(null);
     diagnostics.setStage("request-start");
     diagnostics.beginRequest(diagnosticRequestId, requestHost);
 
@@ -246,7 +254,7 @@ export default function Analyzer() {
       const response = await fetch(`${API_BASE_URL}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: requestedUrl, diagnostic_request_id: diagnosticRequestId }),
+        body: JSON.stringify({ url: requestedUrl, platform: expectedPlatform, diagnostic_request_id: diagnosticRequestId }),
         signal: controller.signal,
       });
       if (analysisRequestId.current !== requestId) return;
@@ -292,7 +300,7 @@ export default function Analyzer() {
       if (!response.ok || data.kind === "error") {
         diagnostics.setStage("http-error");
         const detail = data.kind === "error" ? data.detail : undefined;
-        setError(publicAnalyzeError(detail));
+        setError(publicAnalyzeError(expectedPlatform, detail));
         const backendTechnicalError = data.kind === "error" ? data.technicalError : undefined;
         setTechnicalError(backendTechnicalError ?? technicalMessage("POST /api/analyze", response.status, detail));
         diagnostics.captureError(new Error(detail ?? `HTTP ${response.status}`), "analyze-api-response");
@@ -324,14 +332,22 @@ export default function Analyzer() {
     event.preventDefault();
     diagnostics.resetAttempt();
     diagnostics.setStage("url-parsing");
-    const decision = getAnalyzerUrlDecision(url);
+    const decision = getAnalyzerUrlDecision(url, expectedPlatform);
     diagnostics.setStage("platform-detection");
     const urlContext = describeUrlForDiagnostics(url);
     diagnostics.setUrlContext(urlContext.platform, urlContext.type);
     diagnostics.setStage("capability-check");
-    if (decision.action === "invalid" || decision.action === "tiktok_only") {
+    if (decision.action !== "analyze") {
       setMedia(null);
-      setError(decision.action === "invalid" ? (url.trim() ? "Invalid TikTok link." : "Paste a TikTok link first.") : "TikTok links only — Vidorac currently supports TikTok links on this website.");
+      const name = platformNames[expectedPlatform];
+      setError(
+        decision.action === "invalid"
+          ? (url.trim() ? `Invalid ${name} link.` : `Paste a ${name} link first.`)
+          : decision.action === "wrong_platform"
+            ? `We detected a ${platformNames[decision.platform]} link. Open the ${platformNames[decision.platform]} Downloader instead.`
+            : `This is not a supported ${name} URL.`,
+      );
+      setSuggestedPlatform(decision.action === "wrong_platform" ? decision.platform : null);
       setTechnicalError(null);
       setAnalyzedUrl(null);
       setDownloadError(null);
@@ -423,16 +439,16 @@ export default function Analyzer() {
   function handleQuality(quality: QualityOption["id"]) {
     if (!analyzedUrl) return;
     const body: DownloadBody = quality === "mp3"
-      ? { url: analyzedUrl, quality, audio_bitrate: mp3Bitrate }
-      : { url: analyzedUrl, quality };
+      ? { url: analyzedUrl, platform: expectedPlatform, quality, audio_bitrate: mp3Bitrate }
+      : { url: analyzedUrl, platform: expectedPlatform, quality };
     void prepareDownload(body, `quality:${quality}`);
   }
-  function handleItem(index: number) { if (analyzedUrl) void prepareDownload({ url: analyzedUrl, item_indices: [index] }, `item:${index}`); }
-  function handleAll() { if (analyzedUrl) void prepareDownload({ url: analyzedUrl }, "all"); }
+  function handleItem(index: number) { if (analyzedUrl) void prepareDownload({ url: analyzedUrl, platform: expectedPlatform, item_indices: [index] }, `item:${index}`); }
+  function handleAll() { if (analyzedUrl) void prepareDownload({ url: analyzedUrl, platform: expectedPlatform }, "all"); }
   function handleSelected() {
     if (!analyzedUrl || selectedItems.size === 0) return;
     const indices = [...selectedItems].sort((a, b) => a - b);
-    void prepareDownload({ url: analyzedUrl, item_indices: indices, archive: true }, `selected:${indices.join(",")}`);
+    void prepareDownload({ url: analyzedUrl, platform: expectedPlatform, item_indices: indices, archive: true }, `selected:${indices.join(",")}`);
   }
   function toggleSelected(index: number) {
     setSelectedItems((current) => {
@@ -456,10 +472,11 @@ export default function Analyzer() {
       inputRef.current?.focus();
       return;
     }
-    if (result.text.trim()) { setUrl(result.text.trim()); setError(null); }
+    if (result.text.trim()) { setUrl(result.text.trim()); setError(null); setSuggestedPlatform(null); }
   }
   function handleUrlChange(value: string) {
     setUrl(value);
+    setSuggestedPlatform(null);
     if (value.trim()) return;
     setMedia(null);
     setAnalyzedUrl(null);
@@ -481,7 +498,7 @@ export default function Analyzer() {
     analysisRequestId.current += 1;
     analysisController.current?.abort();
     analysisController.current = null;
-    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setMp3Bitrate(DEFAULT_MP3_BITRATE); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setIsAnalyzing(false);
+    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setMp3Bitrate(DEFAULT_MP3_BITRATE); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setSuggestedPlatform(null); setIsAnalyzing(false);
     const focusInput = () => inputRef.current?.focus();
     if (typeof window === "undefined") focusInput();
     else window.requestAnimationFrame(focusInput);
@@ -492,15 +509,16 @@ export default function Analyzer() {
   const videoQualities = isVideo ? media.quality_options.filter((quality) => quality.id !== "mp3") : [];
   const mp3Quality = isVideo ? media.quality_options.find((quality) => quality.id === "mp3" && quality.available) : undefined;
   const anyPreparing = Object.values(downloadPhases).includes("preparing");
+  const platformName = platformNames[expectedPlatform];
   const metadata = media ? isVideo ? [displayPlatform(media.platform), formatDuration(media.duration), media.max_height ? `${media.max_height}p max` : null].filter(Boolean) : [displayPlatform(media.platform), media.media_type === "image" ? "1 image" : `${media.item_count} ${media.media_type === "gallery" ? "images" : "media items"}`] : [];
   const waitCopy = analysisWaitState === "analyzing"
     ? { title: "Starting analysis…", text: "Connecting securely to Vidorac's media service." }
     : analysisWaitState === "starting"
-    ? { title: "Analyzing TikTok…", text: "Checking the public post and its available video, images and audio." }
+    ? { title: `Analyzing ${platformName}…`, text: "Checking the public post and its available video, images and audio." }
     : analysisWaitState === "taking-longer"
-      ? { title: "Processing your TikTok link…", text: "TikTok may be responding slowly. Please keep this tab open." }
+      ? { title: `Processing your ${platformName} link…`, text: `${platformName} may be responding slowly. Please keep this tab open.` }
       : analysisWaitState === "timed-out"
-        ? { title: "TikTok is taking too long to respond.", text: "Please try again in a moment." }
+        ? { title: `${platformName} is taking too long to respond.`, text: "Please try again in a moment." }
         : null;
   const canRetryAnalysis = Boolean(error && retryUrl && !isAnalyzing);
 
@@ -508,14 +526,14 @@ export default function Analyzer() {
     <div className="downloader-shell mt-8 w-full max-w-5xl text-left">
       <form onSubmit={handleSubmit} noValidate className="mx-auto max-w-4xl">
         <div className={`analyzer-form rounded-xl border bg-[var(--surface)] p-2 sm:flex sm:min-h-[4.25rem] sm:items-center sm:gap-2 ${error ? "border-red-400/30" : "border-[var(--border)]"}`}>
-          <label htmlFor="media-url" className="sr-only">Public TikTok URL</label>
-          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => handleUrlChange(event.target.value)} placeholder="Paste a TikTok link..." className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label="Paste TikTok URL from clipboard">Paste</button></div>
+          <label htmlFor="media-url" className="sr-only">Public {platformName} URL</label>
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => handleUrlChange(event.target.value)} placeholder={placeholder} className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label={`Paste ${platformName} URL from clipboard`}>Paste</button></div>
           <button type="submit" disabled={isAnalyzing} data-analyzing={isAnalyzing} className="analyze-button flex w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--blue)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--blue-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 sm:min-h-[3.25rem] sm:w-auto">
             <span className="relative size-[1.1rem] shrink-0" aria-hidden="true" data-testid="analyze-icon-slot">
               <SearchIcon className={`absolute inset-0 transition-opacity ${isAnalyzing ? "invisible opacity-0" : "visible opacity-100"}`} />
               <span data-testid="analyze-spinner" data-active={isAnalyzing} className={`analysis-wait-spinner absolute inset-0 !m-0 !size-[1.1rem] !border-white/25 !border-t-white transition-opacity ${isAnalyzing ? "visible opacity-100" : "invisible opacity-0"}`} />
             </span>
-            <span data-testid="analyze-label">{isAnalyzing ? "Analyzing TikTok…" : "Analyze"}</span>
+            <span data-testid="analyze-label">{isAnalyzing ? `Analyzing ${platformName}…` : "Analyze"}</span>
           </button>
         </div>
         <div aria-live="polite" aria-atomic="true">
@@ -526,6 +544,7 @@ export default function Analyzer() {
             <button type="button" onClick={retryAnalysis} disabled={analysisWaitState !== "timed-out"} className={`analysis-retry-button ${analysisWaitState === "timed-out" ? "" : "hidden"}`}>Try again</button>
           </div>
           <p id="analyze-error" className={`error-message mt-3 text-sm ${error ? "" : "hidden"}`} aria-hidden={!error}>{error ?? ""}</p>
+          {suggestedPlatform && <Link className="analysis-platform-link" href={platformPaths[suggestedPlatform]}>Open {platformNames[suggestedPlatform]} Downloader <span aria-hidden="true">→</span></Link>}
           <button type="button" data-testid="analyze-error-retry" onClick={retryAnalysis} disabled={!canRetryAnalysis} className={`analysis-retry-button mt-2 ${canRetryAnalysis ? "" : "hidden"}`}>Try again</button>
           {IS_DEVELOPMENT && <button type="button" onClick={copyTechnicalError} disabled={!technicalError || !error} className={`ml-2 mt-2 text-xs text-white/35 underline decoration-white/20 underline-offset-4 transition hover:text-white/65 ${technicalError && error ? "" : "hidden"}`}>{copiedError ? "Copied" : "Copy technical error"}</button>}
         </div>
@@ -544,8 +563,8 @@ export default function Analyzer() {
             const size = formatEstimatedSize(quality.estimated_size_bytes);
             const details = quality.available ? [quality.id === "best" ? "Highest quality" : quality.id === "compatible" ? "Most compatible" : null, quality.resolution, quality.container, quality.video_codec, size].filter(Boolean) : ["Unavailable"];
             return <button key={quality.id} type="button" disabled={phase === "preparing" || !quality.available} onClick={() => handleQuality(quality.id)} title={!quality.available ? `${quality.label} is not available for this video` : undefined} className={`flex min-h-16 items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-not-allowed ${phase ? "border-[#34a5ff]/40 bg-[#1682ff]/20 text-[#9bdcff]" : index < 2 ? "border-[#2389ff]/30 bg-[#1682ff]/10 text-[#84ceff] hover:border-[#45a6ff]/50 hover:bg-[#1682ff]/15 disabled:opacity-40" : "border-white/[0.09] bg-white/[0.035] text-white/65 hover:border-white/20 hover:bg-white/[0.07] disabled:opacity-35"}`}><StableDownloadAction loading={phase === "preparing"} label={phase === "preparing" ? "Preparing..." : phase === "ready" ? "Download ready" : phase === "started" ? "Download started" : quality.label} details={details.join(" · ")} testId={`quality-${quality.id}`} /></button>;
-          })}</div></section><section aria-labelledby="audio-download-title" data-testid="audio-card" className="rounded-xl border border-[#2389ff]/20 bg-[#1682ff]/[0.045] p-3 sm:p-4"><p className="section-label !text-[0.66rem]">Audio</p><h3 id="audio-download-title" className="mt-1 text-sm font-semibold text-white/90">TikTok audio</h3><p className="mt-2 text-xs leading-5 text-white/40">Extract the available audio as an MP3 file.</p>{mp3Quality ? (() => { const key = "quality:mp3"; const phase = downloadPhases[key]; const preparing = phase === "preparing"; const label = preparing ? "Preparing MP3..." : phase === "ready" ? "MP3 ready" : phase === "started" ? "Download started" : "Download MP3"; return <><fieldset disabled={preparing} className="mt-3" data-testid="mp3-bitrate-selector"><legend className="text-xs font-medium text-white/65">Audio quality</legend><div className="mt-2 grid grid-cols-3 gap-1.5">{MP3_BITRATE_OPTIONS.map((option) => { const selected = option.value === mp3Bitrate; return <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMp3Bitrate(option.value)} className={`min-h-14 rounded-lg border px-1.5 py-2 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-55 ${selected ? "border-[#45b7ff]/55 bg-[#1682ff]/20 text-white shadow-[inset_0_0_0_1px_rgba(104,211,255,0.08)]" : "border-white/[0.08] bg-white/[0.025] text-white/55 hover:border-white/20 hover:bg-white/[0.05]"}`}><span className="block text-[0.68rem] font-semibold leading-4 sm:text-xs">{option.label}</span><span className={`mt-0.5 block text-[0.58rem] leading-3 sm:text-[0.65rem] ${selected ? "text-[#7fd5ff]" : "text-white/30"}`}>{option.description}</span></button>; })}</div></fieldset><p className="mt-2 text-[0.65rem] leading-4 text-white/30">Higher bitrate creates a larger MP3 file. It does not improve the original TikTok audio quality.</p><button type="button" disabled={preparing} onClick={() => handleQuality("mp3")} data-testid="mp3-download-button" className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70"><StableDownloadAction loading={preparing} label={label} testId="mp3-action" /></button><span className="sr-only" aria-live="polite" data-testid="mp3-status">{phase ? label : ""}</span></>; })() : <p className="mt-4 rounded-lg border border-white/[0.07] px-3 py-2.5 text-xs text-white/35">MP3 is not available for this TikTok.</p>}</section></div> : gallery?.media_type === "image" ? <><div><p className="section-label !text-[0.66rem]">TikTok photo</p><h3 className="mt-1 text-sm font-semibold text-white/90">Download image</h3></div><button type="button" disabled={downloadPhases.all === "preparing"} onClick={handleAll} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(20,120,255,0.2)] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70 sm:w-auto"><StableDownloadAction loading={downloadPhases.all === "preparing"} label={downloadPhases.all === "preparing" ? "Preparing..." : downloadPhases.all === "ready" ? "Download ready" : downloadPhases.all === "started" ? "Download started" : "Download Image"} testId="image-download" /></button></> : gallery ? <>
-            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="section-label !text-[0.66rem]">Slideshow</p><h3 className="mt-1 text-sm font-semibold text-white/90">TikTok Slideshow</h3><p className="mt-1 text-xs text-white/40">Download one image, select several, or get the complete slideshow.</p></div>{selectedItems.size > 0 && <button type="button" onClick={() => setSelectedItems(new Set())} className="text-xs text-white/45 hover:text-white">Clear selection</button>}</div>
+          })}</div></section><section aria-labelledby="audio-download-title" data-testid="audio-card" className="rounded-xl border border-[#2389ff]/20 bg-[#1682ff]/[0.045] p-3 sm:p-4"><p className="section-label !text-[0.66rem]">Audio</p><h3 id="audio-download-title" className="mt-1 text-sm font-semibold text-white/90">{platformName} audio</h3><p className="mt-2 text-xs leading-5 text-white/40">Extract the available audio as an MP3 file.</p>{mp3Quality ? (() => { const key = "quality:mp3"; const phase = downloadPhases[key]; const preparing = phase === "preparing"; const label = preparing ? "Preparing MP3..." : phase === "ready" ? "MP3 ready" : phase === "started" ? "Download started" : "Download MP3"; return <><fieldset disabled={preparing} className="mt-3" data-testid="mp3-bitrate-selector"><legend className="text-xs font-medium text-white/65">Audio quality</legend><div className="mt-2 grid grid-cols-3 gap-1.5">{MP3_BITRATE_OPTIONS.map((option) => { const selected = option.value === mp3Bitrate; return <button key={option.value} type="button" aria-pressed={selected} onClick={() => setMp3Bitrate(option.value)} className={`min-h-14 rounded-lg border px-1.5 py-2 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-55 ${selected ? "border-[#45b7ff]/55 bg-[#1682ff]/20 text-white shadow-[inset_0_0_0_1px_rgba(104,211,255,0.08)]" : "border-white/[0.08] bg-white/[0.025] text-white/55 hover:border-white/20 hover:bg-white/[0.05]"}`}><span className="block text-[0.68rem] font-semibold leading-4 sm:text-xs">{option.label}</span><span className={`mt-0.5 block text-[0.58rem] leading-3 sm:text-[0.65rem] ${selected ? "text-[#7fd5ff]" : "text-white/30"}`}>{option.description}</span></button>; })}</div></fieldset><p className="mt-2 text-[0.65rem] leading-4 text-white/30">Higher bitrate creates a larger MP3 file. It does not improve the original source audio quality.</p><button type="button" disabled={preparing} onClick={() => handleQuality("mp3")} data-testid="mp3-download-button" className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70"><StableDownloadAction loading={preparing} label={label} testId="mp3-action" /></button><span className="sr-only" aria-live="polite" data-testid="mp3-status">{phase ? label : ""}</span></>; })() : <p className="mt-4 rounded-lg border border-white/[0.07] px-3 py-2.5 text-xs text-white/35">MP3 is not available for this {platformName} post.</p>}</section></div> : gallery?.media_type === "image" ? <><div><p className="section-label !text-[0.66rem]">{platformName} photo</p><h3 className="mt-1 text-sm font-semibold text-white/90">Download image</h3></div><button type="button" disabled={downloadPhases.all === "preparing"} onClick={handleAll} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#1478ff] to-[#1e56f5] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(20,120,255,0.2)] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:cursor-wait disabled:opacity-70 sm:w-auto"><StableDownloadAction loading={downloadPhases.all === "preparing"} label={downloadPhases.all === "preparing" ? "Preparing..." : downloadPhases.all === "ready" ? "Download ready" : downloadPhases.all === "started" ? "Download started" : "Download Image"} testId="image-download" /></button></> : gallery ? <>
+            <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="section-label !text-[0.66rem]">Post media</p><h3 className="mt-1 text-sm font-semibold text-white/90">{platformName} media</h3><p className="mt-1 text-xs text-white/40">Download one item, select several, or get all available media.</p></div>{selectedItems.size > 0 && <button type="button" onClick={() => setSelectedItems(new Set())} className="text-xs text-white/45 hover:text-white">Clear selection</button>}</div>
             <div className="mt-4 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{gallery.items.map((item) => {
               const key = `item:${item.index}`;
               const phase = downloadPhases[key];

@@ -121,7 +121,7 @@ class DownloadEndpointTests(unittest.TestCase):
         artifact = make_artifact("Safe title.mp4")
         with patch("app.main.download_media", return_value=artifact):
             response = asyncio.run(
-                prepare_download(DownloadRequest(url="https://youtu.be/test", quality="720"), make_http_request())
+                prepare_download(DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality="720"), make_http_request())
             )
 
         self.assertTrue(response["success"])
@@ -130,6 +130,30 @@ class DownloadEndpointTests(unittest.TestCase):
         self.assertNotIn("path", response)
         self.assertNotIn("temp_directory", response)
 
+    def test_prepare_rejects_a_cross_platform_url_before_extraction(self) -> None:
+        with (
+            patch("app.main.preparation_rate_limiter.allow", return_value=True),
+            patch("app.main.download_media") as downloader,
+        ):
+            response = asyncio.run(
+                prepare_download(
+                    DownloadRequest(
+                        url="https://www.tiktok.com/@creator/video/123",
+                        platform="reddit",
+                        quality="best",
+                    ),
+                    make_http_request(),
+                )
+            )
+
+        self.assertIsInstance(response, JSONResponse)
+        self.assertEqual(response.status_code, 400)
+        payload = json.loads(response.body)
+        self.assertEqual(payload["error_code"], "wrong_platform")
+        self.assertEqual(payload["expected_platform"], "reddit")
+        self.assertEqual(payload["detected_platform"], "tiktok")
+        downloader.assert_not_called()
+
     def test_gallery_prepare_passes_only_validated_indices_to_backend(self) -> None:
         artifact = make_artifact("Selected post.zip")
         with patch("app.main.download_gallery_post", return_value=artifact) as gallery:
@@ -137,6 +161,7 @@ class DownloadEndpointTests(unittest.TestCase):
                 prepare_download(
                     DownloadRequest(
                         url="https://www.instagram.com/p/ABC123/",
+                        platform="instagram",
                         item_indices=[0, 2],
                         archive=True,
                     ),
@@ -163,6 +188,7 @@ class DownloadEndpointTests(unittest.TestCase):
                     prepare_download(
                         DownloadRequest(
                             url="https://www.tiktok.com/@creator/video/123",
+                            platform="tiktok",
                             quality="mp3",
                             audio_bitrate=bitrate,
                         ),
@@ -179,8 +205,8 @@ class DownloadEndpointTests(unittest.TestCase):
 
     def test_preparing_again_creates_a_new_download_id(self) -> None:
         with patch("app.main.download_media", side_effect=[make_artifact("first.mp4"), make_artifact("second.mp4")]):
-            first = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best"), make_http_request()))
-            second = asyncio.run(prepare_download(DownloadRequest(url="https://youtu.be/test", quality="best"), make_http_request()))
+            first = asyncio.run(prepare_download(DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality="best"), make_http_request()))
+            second = asyncio.run(prepare_download(DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality="best"), make_http_request()))
 
         self.assertNotEqual(first["download_id"], second["download_id"])
 

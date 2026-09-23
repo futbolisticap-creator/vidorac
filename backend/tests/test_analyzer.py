@@ -279,28 +279,6 @@ class UrlValidationTests(unittest.TestCase):
             self.assertEqual(caught.exception.error_category, expected_category)
             self.assertIn("YouTube extractor", caught.exception.technical_error or "")
 
-    def test_youtube_challenge_response_is_sanitized_and_temporary(self) -> None:
-        from app.main import AnalyzeRequest, analyze
-
-        error = AnalysisTemporaryError(
-            "youtube",
-            technical_error="YouTube extractor · temporary_platform_challenge · Sign in to confirm you're not a bot",
-            error_category="temporary_platform_challenge",
-        )
-        with (
-            patch("app.main.DEVELOPMENT_MODE", True),
-            patch("app.main.analyze_content", side_effect=error),
-        ):
-            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.youtube.com/watch?v=test")))
-        payload = json.loads(response.body)
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(
-            payload["detail"],
-            "YouTube is temporarily unable to process this request from our server. Please try again later.",
-        )
-        self.assertEqual(payload["technical_error"], error.technical_error)
-
-
 class AnalyzeEndpointErrorTests(unittest.TestCase):
     def test_diagnostic_request_id_is_validated_and_logged_without_media_url(self) -> None:
         from pydantic import ValidationError
@@ -309,10 +287,11 @@ class AnalyzeEndpointErrorTests(unittest.TestCase):
         media_url = "https://www.tiktok.com/@creator/video/123"
         request = AnalyzeRequest(
             url=media_url,
+            platform="tiktok",
             diagnostic_request_id="mobile-debug-abc12345-1234abcd",
         )
         with (
-            patch("app.main.PUBLIC_PLATFORMS", frozenset({"tiktok"})),
+            patch("app.main.PUBLIC_PLATFORMS", frozenset({"tiktok", "instagram", "facebook", "reddit", "x"})),
             patch("app.main.analyze_content", return_value={"media_type": "video"}),
             self.assertLogs("vidorac.analyze", level="INFO") as captured,
         ):
@@ -321,19 +300,21 @@ class AnalyzeEndpointErrorTests(unittest.TestCase):
         self.assertNotIn(media_url, captured.output[0])
 
         with self.assertRaises(ValidationError):
-            AnalyzeRequest(url=media_url, diagnostic_request_id="unsafe request id")
+            AnalyzeRequest(url=media_url, platform="tiktok", diagnostic_request_id="unsafe request id")
 
-    def test_tiktok_only_deployment_rejects_other_platform_before_extraction(self) -> None:
+    def test_platform_mismatch_is_rejected_before_extraction(self) -> None:
         from app.main import AnalyzeRequest, analyze
 
         with (
-            patch("app.main.PUBLIC_PLATFORMS", frozenset({"tiktok"})),
+            patch("app.main.PUBLIC_PLATFORMS", frozenset({"tiktok", "instagram", "facebook", "reddit", "x"})),
             patch("app.main.analyze_content") as extractor,
         ):
-            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.youtube.com/watch?v=test")))
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.instagram.com/reel/test/", platform="tiktok")))
         payload = json.loads(response.body)
         self.assertEqual(response.status_code, 400)
-        self.assertIn("TikTok links only", payload["detail"])
+        self.assertEqual(payload["error_code"], "wrong_platform")
+        self.assertEqual(payload["expected_platform"], "tiktok")
+        self.assertEqual(payload["detected_platform"], "instagram")
         extractor.assert_not_called()
 
     def test_instagram_post_restriction_is_useful_and_not_misclassified_as_private(self) -> None:
@@ -341,7 +322,7 @@ class AnalyzeEndpointErrorTests(unittest.TestCase):
         from app.media_gallery import InstagramPostTemporarilyUnavailableError
 
         with patch("app.main.analyze_content", side_effect=InstagramPostTemporarilyUnavailableError):
-            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.instagram.com/p/ABC123/")))
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.instagram.com/p/ABC123/", platform="instagram")))
         payload = json.loads(response.body)
         self.assertEqual(response.status_code, 503)
         self.assertEqual(
@@ -362,7 +343,7 @@ class AnalyzeEndpointErrorTests(unittest.TestCase):
             patch("app.main.DEVELOPMENT_MODE", True),
             patch("app.main.analyze_content", side_effect=error),
         ):
-            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.tiktok.com/@creator/video/123")))
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok")))
         payload = json.loads(response.body)
         self.assertEqual(response.status_code, 503)
         self.assertEqual(
@@ -382,7 +363,7 @@ class AnalyzeEndpointErrorTests(unittest.TestCase):
             patch("app.main.DEVELOPMENT_MODE", False),
             patch("app.main.analyze_content", side_effect=error),
         ):
-            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.tiktok.com/@creator/video/123")))
+            response = asyncio.run(analyze(AnalyzeRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok")))
         self.assertNotIn("technical_error", json.loads(response.body))
 
 

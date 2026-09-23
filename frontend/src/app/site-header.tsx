@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import SupportButton from "./support-button";
+import { platformConfigs, platformOrder } from "./platform-config";
 
 export default function SiteHeader() {
   return (
@@ -13,8 +13,8 @@ export default function SiteHeader() {
 
         <div className="primary-nav-desktop ml-auto items-center gap-1 text-sm text-[var(--text-muted)]">
           <Link href="/" className="header-link header-home-link">Home</Link>
+          {platformOrder.map((id) => <Link key={id} href={platformConfigs[id].path} className="header-link">{platformConfigs[id].name}</Link>)}
           <Link href="/contact" className="header-link header-contact-link">Contact</Link>
-          <SupportButton />
         </div>
 
         <details className="primary-nav-mobile ml-auto">
@@ -26,8 +26,8 @@ export default function SiteHeader() {
           </summary>
           <div className="mobile-nav-panel">
             <Link href="/" className="header-link">Home</Link>
+            {platformOrder.map((id) => <Link key={id} href={platformConfigs[id].path} className="header-link">{platformConfigs[id].name}</Link>)}
             <Link href="/contact" className="header-link">Contact</Link>
-            <SupportButton />
           </div>
         </details>
       </nav>

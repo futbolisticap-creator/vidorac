@@ -14,7 +14,7 @@ services:
       - key: VIDORAC_MAX_CONCURRENT_JOBS
         value: "2"
       - key: VIDORAC_PUBLIC_PLATFORMS
-        value: tiktok
+        value: tiktok,instagram,facebook,reddit,x
       - key: VIDORAC_PREPARATION_RATE_LIMIT
         value: "12"
       - key: VIDORAC_ALLOWED_ORIGINS
