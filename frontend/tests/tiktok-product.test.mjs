@@ -9,10 +9,24 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 test("homepage is a five-platform Vidorac hub without unfinished product promotion", async () => {
   const source = await read("src/app/page.tsx");
   const config = await read("src/app/platform-config.ts");
-  assert.match(source, /Download media from your/);
+  assert.match(source, /Download public media/);
   for (const platform of ["TikTok", "Instagram", "Facebook", "Reddit", "X \/ Twitter"]) assert.match(config, new RegExp(platform.replace("/", "\\/")));
   for (const forbidden of ["Vidorac Desktop", "Vidorac Mobile", "Chrome extension", "Pro subscription"]) assert.doesNotMatch(source, new RegExp(forbidden));
   assert.doesNotMatch(source, /YouTube/);
+});
+
+test("refined layout is compact, ad-ready and removes the header Beta badge", async () => {
+  const home = await read("src/app/page.tsx");
+  const platformPage = await read("src/app/platform-downloader-page.tsx");
+  const header = await read("src/app/site-header.tsx");
+  const ad = await read("src/app/ad-placeholder.tsx");
+  assert.match(home, /<AdPlaceholder/);
+  assert.match(platformPage, /ad-slot-after-tool/);
+  assert.match(platformPage, /compact-steps/);
+  assert.doesNotMatch(platformPage, /related-platforms/);
+  assert.doesNotMatch(header, /beta-badge|>Beta</);
+  assert.match(ad, /Reserved for future advertising/);
+  assert.doesNotMatch(ad, /googlesyndication|ca-pub-/);
 });
 
 test("all public downloader routes reuse the shared platform page", async () => {

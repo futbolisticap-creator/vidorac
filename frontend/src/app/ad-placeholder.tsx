@@ -4,9 +4,9 @@ type AdPlaceholderProps = {
 };
 
 const dimensions = {
-  banner: "728 × 90",
-  rectangle: "300 × 250",
-  sidebar: "160 × 600",
+  banner: "Horizontal placement",
+  rectangle: "Compact placement",
+  sidebar: "Vertical placement",
 };
 
 export default function AdPlaceholder({
@@ -16,9 +16,9 @@ export default function AdPlaceholder({
   return (
     <aside
       className={`ad-placeholder ad-${format} ${className}`}
-      aria-label="Advertisement placeholder"
+      aria-label="Reserved advertising space"
     >
-      <span className="ad-description">Advertisement</span>
+      <span className="ad-description">Reserved for future advertising</span>
       <span className="ad-dimensions">{dimensions[format]}</span>
     </aside>
   );

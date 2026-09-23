@@ -10,7 +10,6 @@ export default function SiteFooter() {
           <div className="max-w-sm">
             <div className="footer-brand">
               <Image src="/branding/vidorac-logo.svg" alt="Vidorac" width={124} height={32} className="footer-brand-logo" />
-              <span className="footer-beta">Public Beta</span>
             </div>
             <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Focused public-media downloaders for TikTok, Instagram, Facebook, Reddit and X.</p>
           </div>

@@ -8,7 +8,6 @@ export default function SiteHeader() {
       <nav className="mx-auto flex h-[4.5rem] w-full max-w-[73.75rem] items-center gap-4 px-4 sm:px-6 lg:px-8" aria-label="Primary navigation">
         <Link href="/" className="group flex shrink-0 items-center gap-2" aria-label="Vidorac home">
           <Image src="/branding/vidorac-logo.svg" alt="" width={132} height={34} className="brand-logo" priority />
-          <span className="beta-badge">Beta</span>
         </Link>
 
         <div className="primary-nav-desktop ml-auto items-center gap-1 text-sm text-[var(--text-muted)]">
