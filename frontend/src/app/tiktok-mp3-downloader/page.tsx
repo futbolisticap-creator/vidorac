@@ -7,6 +7,7 @@ export default function TikTokMp3DownloaderPage() {
   return <TikTokLanding content={{
     eyebrow: "TikTok MP3 Downloader",
     h1: "TikTok MP3 Downloader",
+    heroAccent: "from one public video link",
     intro: "Paste a public TikTok video link and download its available audio as an MP3 file.",
     overviewTitle: "A simple MP3 option for eligible TikToks",
     overview: ["After analysis, Vidorac shows a dedicated Audio section when the public TikTok contains a usable audio stream. Choose 128 kbps for a smaller file, 192 kbps for the recommended balance, or 320 kbps for a larger output file.", "The selected bitrate controls MP3 output encoding and file size. It cannot restore detail that was not present in TikTok's compressed source."],

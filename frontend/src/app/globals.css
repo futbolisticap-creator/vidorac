@@ -2094,3 +2094,123 @@ button { -webkit-tap-highlight-color: transparent; }
   .home-faq-list article,
   .home-faq-icon { transition: none; }
 }
+
+/* Shared editorial typography for every downloader page */
+.platform-page {
+  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+}
+
+.downloader-hero-heading {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+
+.platform-page .downloader-hero-heading h1 {
+  display: flex;
+  width: 100%;
+  max-width: 62rem;
+  flex-direction: column;
+  margin: 1rem auto 0;
+  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-size: clamp(2.7rem, 5.8vw, 4.75rem);
+  font-weight: 760;
+  letter-spacing: -0.066em;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.platform-page .downloader-hero-heading h1 em {
+  display: block;
+  max-width: 56rem;
+  margin: 0.23em auto 0;
+  color: #75d5ff;
+  font-family: var(--font-home-serif), Georgia, serif;
+  font-size: 0.76em;
+  font-weight: 400;
+  letter-spacing: -0.022em;
+  line-height: 1;
+  text-shadow: 0 10px 30px rgba(22, 119, 242, 0.14);
+  text-wrap: balance;
+}
+
+.platform-page .platform-hero-copy {
+  margin-top: 1.35rem;
+}
+
+.editorial-section-heading {
+  min-width: 0;
+}
+
+.editorial-section-heading-compact {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.editorial-section-heading h2 {
+  display: flex;
+  max-width: 48rem;
+  flex-direction: column;
+  margin-top: 0.5rem;
+  color: var(--text);
+  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-weight: 720;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.editorial-section-heading h2 em {
+  margin-top: 0.14em;
+  color: #72d0fb;
+  font-family: var(--font-home-serif), Georgia, serif;
+  font-size: 1.08em;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
+
+.editorial-section-heading-compact > p {
+  max-width: 24rem;
+  color: var(--text-faint);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.editorial-section-heading-seo { margin-bottom: 0; }
+.seo-section > .editorial-section-heading-seo { max-width: 48rem; }
+
+@media (max-width: 767px) {
+  .platform-page .downloader-hero-heading h1 {
+    font-size: clamp(2.35rem, 11.8vw, 3.55rem);
+    letter-spacing: -0.058em;
+    line-height: 1;
+  }
+
+  .platform-page .downloader-hero-heading h1 em {
+    max-width: 31rem;
+    margin-top: 0.3em;
+    font-size: 0.72em;
+    line-height: 1.04;
+  }
+
+  .editorial-section-heading-compact {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .editorial-section-heading-compact > p { text-align: left; }
+  .editorial-section-heading h2 { font-size: clamp(1.55rem, 8vw, 2rem); }
+}
+
+@media (max-width: 390px) {
+  .platform-page .downloader-hero-heading h1 { font-size: clamp(2.1rem, 10.8vw, 2.75rem); }
+  .platform-page .downloader-hero-heading h1 em { font-size: 0.75em; }
+}

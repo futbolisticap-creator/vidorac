@@ -50,6 +50,24 @@ test("homepage redesign keeps premium CTAs and accessible FAQ controls", async (
   assert.match(styles, /@media \(min-width: 1680px\)/);
 });
 
+test("every downloader route uses the shared premium editorial typography", async () => {
+  const sharedPage = await read("src/app/platform-downloader-page.tsx");
+  const headings = await read("src/app/editorial-heading.tsx");
+  const config = await read("src/app/platform-config.ts");
+  const legacyLanding = await read("src/app/tiktok-landing.tsx");
+  assert.match(sharedPage, /<DownloaderHeroHeading/);
+  assert.match(sharedPage, /<EditorialSectionHeading/);
+  assert.match(legacyLanding, /<DownloaderHeroHeading/);
+  assert.match(legacyLanding, /<EditorialSectionHeading/);
+  assert.match(headings, /downloader-hero-heading/);
+  assert.match(headings, /editorial-section-heading/);
+  for (const accent of ["without the extra steps", "from one simple link", "with a cleaner workflow", "without the clutter", "simply from the link"]) assert.match(config, new RegExp(accent));
+  for (const route of ["tiktok-downloader", "tiktok-mp3-downloader", "tiktok-slideshow-downloader"]) {
+    const source = await read(`src/app/${route}/page.tsx`);
+    assert.match(source, /heroAccent:/);
+  }
+});
+
 test("all public downloader routes reuse the shared platform page", async () => {
   for (const route of ["tiktok", "instagram", "facebook", "reddit", "x"]) {
     const page = await read(`src/app/${route}/page.tsx`);

@@ -5,6 +5,8 @@ export type PlatformPageConfig = {
   path: string;
   name: string;
   title: string;
+  heroTitle: string;
+  heroAccent: string;
   description: string;
   placeholder: string;
   cardDescription: string;
@@ -18,6 +20,7 @@ export type PlatformPageConfig = {
 export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
   tiktok: {
     id: "tiktok", path: "/tiktok", name: "TikTok", title: "TikTok Video Downloader",
+    heroTitle: "Download TikTok videos", heroAccent: "without the extra steps",
     description: "Download public TikTok videos, photo slideshows and available audio with Vidorac.",
     placeholder: "Paste a TikTok link...", cardDescription: "Download public videos, slideshows and audio.",
     supported: "Videos, photo posts and available MP3 audio",
@@ -36,6 +39,7 @@ export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
   },
   instagram: {
     id: "instagram", path: "/instagram", name: "Instagram", title: "Instagram Video & Reels Downloader",
+    heroTitle: "Download Instagram media", heroAccent: "from one simple link",
     description: "Download compatible public Instagram Reels, videos, photos and carousel media with Vidorac.",
     placeholder: "Paste an Instagram link...", cardDescription: "Download public Reels, videos, photos and carousels.",
     supported: "Reels, videos, photos and carousels where publicly accessible",
@@ -54,6 +58,7 @@ export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
   },
   facebook: {
     id: "facebook", path: "/facebook", name: "Facebook", title: "Facebook Video Downloader",
+    heroTitle: "Download Facebook videos", heroAccent: "with a cleaner workflow",
     description: "Download compatible publicly accessible Facebook videos with Vidorac.",
     placeholder: "Paste a Facebook video link...", cardDescription: "Download compatible public Facebook videos.",
     supported: "Public videos, Reels and fb.watch links where available",
@@ -72,6 +77,7 @@ export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
   },
   reddit: {
     id: "reddit", path: "/reddit", name: "Reddit", title: "Reddit Video Downloader",
+    heroTitle: "Download Reddit media", heroAccent: "without the clutter",
     description: "Download compatible public Reddit-hosted videos and post media with Vidorac.",
     placeholder: "Paste a Reddit post link...", cardDescription: "Download public Reddit videos and post media.",
     supported: "Reddit posts, galleries, redd.it and v.redd.it links",
@@ -90,6 +96,7 @@ export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
   },
   x: {
     id: "x", path: "/x", name: "X / Twitter", title: "X / Twitter Video Downloader",
+    heroTitle: "Download videos from X", heroAccent: "simply from the link",
     description: "Download compatible public videos and media from X or legacy Twitter post links.",
     placeholder: "Paste an X or Twitter link...", cardDescription: "Download public video from X and Twitter links.",
     supported: "Public x.com and twitter.com status links",

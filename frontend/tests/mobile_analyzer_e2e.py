@@ -67,6 +67,24 @@ VIDEO_RESPONSE = {
         ],
     },
 }
+PLATFORM_HERO_CASES = (
+    ("/tiktok", "Download TikTok videos without the extra steps"),
+    ("/instagram", "Download Instagram media from one simple link"),
+    ("/facebook", "Download Facebook videos with a cleaner workflow"),
+    ("/reddit", "Download Reddit media without the clutter"),
+    ("/x", "Download videos from X simply from the link"),
+    ("/tiktok-downloader", "TikTok Video, Slideshow & MP3 Downloader with every available option in one place"),
+    ("/tiktok-mp3-downloader", "TikTok MP3 Downloader from one public video link"),
+    ("/tiktok-slideshow-downloader", "TikTok Slideshow Downloader for the photos you want to keep"),
+)
+TYPOGRAPHY_VIEWPORTS = (
+    (375, 812),
+    (390, 844),
+    (430, 932),
+    (768, 1024),
+    (1024, 900),
+    (1440, 1000),
+)
 
 
 def browser_executable() -> str | None:
@@ -182,7 +200,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
 
     page.goto(TIKTOK_DOWNLOADER_URL, wait_until="networkidle")
     page.locator("#media-url").wait_for()
-    page.get_by_role("heading", name="TikTok Video Downloader").wait_for()
+    page.get_by_role("heading", name="Download TikTok videos without the extra steps").wait_for()
     assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
@@ -294,6 +312,29 @@ def run_idle_state_case(browser) -> None:
     assert_clean_idle()
     assert not page_errors, page_errors
     context.close()
+
+
+def run_platform_typography_matrix(browser) -> None:
+    for width, height in TYPOGRAPHY_VIEWPORTS:
+        context = browser.new_context(
+            viewport={"width": width, "height": height},
+            is_mobile=width < 768,
+            has_touch=width < 768,
+        )
+        page = context.new_page()
+        page_errors: list[str] = []
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
+        for route, heading in PLATFORM_HERO_CASES:
+            page.goto(f"{SITE_ORIGIN}{route}", wait_until="networkidle")
+            page.get_by_role("heading", name=heading, exact=True).wait_for()
+            accent = page.locator(".downloader-hero-heading h1 em")
+            assert accent.is_visible(), f"{route} at {width}px: editorial accent is hidden"
+            assert "Instrument Serif" in accent.evaluate("element => getComputedStyle(element).fontFamily"), f"{route} at {width}px: editorial font is missing"
+            assert page.locator("#media-url").is_visible(), f"{route} at {width}px: analyzer is not directly available"
+            overflow = page.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth")
+            assert not overflow, f"{route} at {width}px: horizontal overflow"
+        assert not page_errors, {"viewport": width, "page_errors": page_errors}
+        context.close()
 
 
 def run_donation_fallback_case(browser) -> None:
@@ -675,6 +716,8 @@ with sync_playwright() as playwright:
         for viewport in VIEWPORTS:
             if not requested_viewports or viewport[0] in requested_viewports:
                 print(run_viewport(browser, *viewport), flush=True)
+        run_platform_typography_matrix(browser)
+        print({"platform_typography_matrix": "passed", "route_viewport_checks": len(PLATFORM_HERO_CASES) * len(TYPOGRAPHY_VIEWPORTS)}, flush=True)
     if not mp3_only:
         run_idle_state_case(browser)
         run_donation_fallback_case(browser)

@@ -11,6 +11,7 @@ export default function TikTokDownloaderPage() {
   return <TikTokLanding content={{
     eyebrow: "TikTok Downloader",
     h1: "TikTok Video, Slideshow & MP3 Downloader",
+    heroAccent: "with every available option in one place",
     intro: "Paste a public TikTok link to download its available video, photo slideshow or audio as MP3.",
     overviewTitle: "One TikTok link, clear download choices",
     overview: [

@@ -7,6 +7,7 @@ export default function TikTokSlideshowDownloaderPage() {
   return <TikTokLanding content={{
     eyebrow: "TikTok Slideshow Downloader",
     h1: "TikTok Slideshow Downloader",
+    heroAccent: "for the photos you want to keep",
     intro: "Paste a public TikTok photo-post link to preview and download its available slideshow images.",
     overviewTitle: "Download the slideshow your way",
     overview: ["Vidorac displays all publicly available images in post order. Download a single image directly, select only the images you need, or prepare the complete slideshow together.", "Complete and selected multi-image downloads use the existing ZIP workflow. A single selected item remains a normal image download when possible."],
