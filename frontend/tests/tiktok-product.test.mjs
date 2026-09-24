@@ -80,6 +80,18 @@ test("legal pages and safe donation implementation remain intact", async () => {
   assert.match(footer, /not affiliated with, endorsed by, or sponsored by TikTok, Instagram, Facebook, Reddit, or X/);
 });
 
+test("footer uses four balanced columns and preserves every destination", async () => {
+  const footer = await read("src/app/site-footer.tsx");
+  const styles = await read("src/app/globals.css");
+  assert.match(footer, /footer-columns/);
+  for (const heading of ["Downloaders", "Legal", "Community"]) assert.match(footer, new RegExp(`>${heading}<`));
+  for (const route of ["privacy", "terms", "contact"]) assert.match(footer, new RegExp(`href="/${route}"`));
+  assert.match(footer, /platformOrder\.map/);
+  assert.match(styles, /grid-template-columns: minmax\(0, 2fr\) repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /grid-template-columns: minmax\(0, 1\.4fr\) minmax\(0, 1fr\)/);
+  assert.match(styles, /\.footer-columns \{ grid-template-columns: 1fr;/);
+});
+
 test("public contact email and mailto use the Vidorac address", async () => {
   const config = await read("src/app/contact-config.ts");
   assert.match(config, /CONTACT_EMAIL = "vidorac\.ai@gmail\.com"/);
