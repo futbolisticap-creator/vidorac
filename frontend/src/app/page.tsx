@@ -81,8 +81,8 @@ export default function Home() {
                       <p className="section-label">{platform.name}</p>
                     </div>
                     <div className="platform-card-copy"><h3>{platform.title}</h3><p>{platform.cardDescription}</p></div>
-                    <Link className="platform-card-cta" href={platform.path} aria-label={`Open ${ctaNames[id]} Downloader`}>
-                      <span>Open {ctaNames[id]} Downloader</span><span className="platform-card-arrow" aria-hidden="true">→</span>
+                    <Link className="platform-card-cta secondary-card-cta" href={platform.path} aria-label={`Open ${ctaNames[id]} Downloader`}>
+                      <span className="serif-action-label">Open {ctaNames[id]} Downloader</span><span className="platform-card-arrow" aria-hidden="true">→</span>
                     </Link>
                   </article>
                 );

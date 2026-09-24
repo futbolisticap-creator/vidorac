@@ -12,7 +12,7 @@ export default function PlatformDownloaderPage({ config }: { config: PlatformPag
   return (
     <main className="page-shell platform-page min-h-screen text-white">
       <section className="platform-hero mx-auto w-full max-w-[73.75rem] px-4 text-center sm:px-6 lg:px-8">
-        <Link className="platform-back-link" href="/"><span aria-hidden="true">←</span><span>All downloaders</span></Link>
+        <Link className="platform-back-link" href="/"><span aria-hidden="true">←</span><span className="serif-action-label">All downloaders</span></Link>
         <DownloaderHeroHeading eyebrow={`${config.name} downloader`} title={config.heroTitle} accent={config.heroAccent} />
         <p className="platform-hero-copy">{config.description}</p>
         <AnalyzerDiagnosticsProvider>

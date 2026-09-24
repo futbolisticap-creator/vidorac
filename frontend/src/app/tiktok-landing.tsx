@@ -23,7 +23,7 @@ export default function TikTokLanding({ content }: { content: TikTokLandingConte
   return (
     <main className="page-shell platform-page min-h-screen text-white">
       <section className="platform-hero mx-auto w-full max-w-[73.75rem] px-4 pb-12 pt-32 text-center sm:px-6 sm:pt-36 lg:px-8">
-        <Link className="platform-back-link" href="/"><span aria-hidden="true">←</span><span>Back to Vidorac</span></Link>
+        <Link className="platform-back-link" href="/"><span aria-hidden="true">←</span><span className="serif-action-label">Back to Vidorac</span></Link>
         <DownloaderHeroHeading eyebrow={content.eyebrow} title={content.h1} accent={content.heroAccent} />
         <p className="mx-auto mt-5 max-w-2xl text-pretty text-base leading-7 text-[var(--text-muted)] sm:text-lg">{content.intro}</p>
         <AnalyzerDiagnosticsProvider><AnalyzerBoundary><Analyzer /></AnalyzerBoundary></AnalyzerDiagnosticsProvider>

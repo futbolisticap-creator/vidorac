@@ -2371,3 +2371,54 @@ button { -webkit-tap-highlight-color: transparent; }
   .other-downloader-card,
   .other-downloader-arrow { transition: none; }
 }
+
+/* Shared secondary CTA treatment for homepage and cross-platform cards */
+.home-page .hub-platform-card .secondary-card-cta,
+.other-downloader-card > .secondary-card-cta {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.68rem 1rem;
+  border: 1px solid rgba(116, 170, 207, 0.24);
+  border-radius: 11px;
+  background: rgba(12, 29, 48, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  color: #8edcff;
+  font-weight: 650;
+  text-decoration: none;
+  transition: transform 200ms ease, border-color 200ms ease, background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+}
+
+.home-page .hub-platform-card .secondary-card-cta:hover,
+.other-downloader-card > .secondary-card-cta:hover {
+  transform: translateY(-1px);
+  border-color: rgba(104, 211, 255, 0.42);
+  background: rgba(19, 42, 68, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #c6efff;
+}
+
+.home-page .hub-platform-card .secondary-card-cta:active,
+.other-downloader-card > .secondary-card-cta:active {
+  transform: translateY(0);
+  background: rgba(10, 25, 42, 0.9);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
+}
+
+.home-page .hub-platform-card .secondary-card-cta:focus-visible,
+.other-downloader-card > .secondary-card-cta:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.serif-action-label {
+  font-family: var(--font-home-serif), Georgia, serif;
+  font-size: 1.05rem;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+@media (max-width: 390px) {
+  .serif-action-label { font-size: 1rem; }
+}

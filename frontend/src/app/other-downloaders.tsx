@@ -36,8 +36,8 @@ export default function OtherDownloaders({ currentPlatform }: { currentPlatform:
                 <h3>{platform.name}</h3>
               </div>
               <p>{platform.cardDescription}</p>
-              <Link href={platform.path} aria-label={`Open ${ctaNames[platformId]} Downloader`}>
-                <span>Open {ctaNames[platformId]} Downloader</span>
+              <Link className="secondary-card-cta" href={platform.path} aria-label={`Open ${ctaNames[platformId]} Downloader`}>
+                <span className="serif-action-label">Open {ctaNames[platformId]} Downloader</span>
                 <span className="other-downloader-arrow" aria-hidden="true">→</span>
               </Link>
             </article>
@@ -46,7 +46,7 @@ export default function OtherDownloaders({ currentPlatform }: { currentPlatform:
       </div>
 
       <Link href="/" className="platform-back-link other-downloaders-all">
-        <span>View all downloaders</span>
+        <span className="serif-action-label">View all downloaders</span>
         <span className="other-downloader-arrow" aria-hidden="true">→</span>
       </Link>
     </section>

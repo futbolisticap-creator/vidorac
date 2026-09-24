@@ -30,7 +30,7 @@ export default function SupportButton({
       className={`support-button support-button-${variant}`}
     >
       <span aria-hidden="true" className="support-heart">♥</span>
-      <span>{label}</span>
+      <span className="serif-action-label">{label}</span>
     </button>
   );
 }

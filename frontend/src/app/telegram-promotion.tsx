@@ -34,8 +34,8 @@ export function TelegramTopBar() {
           <span>New features, fixes and important service updates.</span>
         </div>
         <a {...telegramLinkProps} className="telegram-topbar-link">
-          <span className="telegram-join-desktop">Join Telegram</span>
-          <span className="telegram-join-mobile">Join</span>
+          <span className="telegram-join-desktop serif-action-label">Join Telegram</span>
+          <span className="telegram-join-mobile serif-action-label">Join</span>
         </a>
       </div>
     </aside>
@@ -59,7 +59,7 @@ export function TelegramHomepageCard() {
         <li>Important service announcements</li>
       </ul>
       <a {...telegramLinkProps} className="telegram-home-link">
-        Join Vidorac on Telegram
+        <span className="serif-action-label">Join Vidorac on Telegram</span>
         <span aria-hidden="true">↗</span>
       </a>
     </section>
