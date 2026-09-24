@@ -5,13 +5,27 @@ import HomeFaq from "./home-faq";
 import PlatformBrandIcon from "./platform-brand-icon";
 import { platformConfigs, platformOrder } from "./platform-config";
 import SiteFooter from "./site-footer";
-import { SITE_URL } from "./seo";
+import { OG_IMAGE_ALT, OG_IMAGE_PATH, SITE_URL } from "./seo";
 import { TelegramHomepageCard } from "./telegram-promotion";
 
 export const metadata: Metadata = {
   title: { absolute: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X" },
   description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
   alternates: { canonical: `${SITE_URL}/` },
+  openGraph: {
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
+    description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
+    url: `${SITE_URL}/`,
+    siteName: "Vidorac",
+    type: "website",
+    images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: OG_IMAGE_ALT }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
+    description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
+    images: [OG_IMAGE_PATH],
+  },
 };
 
 const steps = [

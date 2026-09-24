@@ -104,7 +104,7 @@ function publicDownloadError(platform: PlatformId, detail?: string): string {
   if (detail.includes("selected media")) return "That item is no longer available in this post. Analyze it again.";
   if (detail.includes("not available")) return "This media is no longer available.";
   if (detail.includes("format")) return "This format is not available for this video.";
-  if (detail.includes("250 MB") || detail.includes("too large")) return "This file is too large for the current Vidorac Beta limits.";
+  if (detail.includes("250 MB") || detail.includes("too large")) return "This file is too large for the current Vidorac limits.";
   if (detail.includes("3-hour")) return "This video is longer than Vidorac's 3-hour limit.";
   if (detail.includes("FFmpeg")) return "Vidorac needs FFmpeg to prepare this format.";
   return "We couldn't prepare this download. Please try again.";

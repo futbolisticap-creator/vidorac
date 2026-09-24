@@ -23,7 +23,7 @@ export default function TikTokDownloaderPage() {
       { title: "MP3 audio", text: "Extract the available audio from an eligible TikTok video as MP3." },
       { title: "Photo slideshows", text: "Download one image, a selection, or all available slideshow images." },
     ],
-    limitations: ["Public individual posts only.", "Quality and audio availability vary by source.", "Maximum prepared download size applies during Beta.", "Vidorac is not affiliated with TikTok or ByteDance."],
+    limitations: ["Public individual posts only.", "Quality and audio availability vary by source.", "A maximum prepared download size applies.", "Vidorac is not affiliated with TikTok or ByteDance."],
     faqs: [
       { question: "Which TikTok links are supported?", answer: "Public tiktok.com video links and compatible TikTok short links can be analyzed when the existing secure validator accepts them." },
       { question: "Can I download TikTok audio?", answer: "Yes. Download MP3 appears for eligible videos when Vidorac can access an audio stream and safely convert it." },

@@ -160,3 +160,29 @@ test("Telegram promotion is visible, safe and limited to normal links", async ()
   assert.match(telegram, /rel: "noopener noreferrer"/);
   assert.doesNotMatch(telegram, /script|iframe|analytics/i);
 });
+
+test("production SEO and legal copy use the canonical Vidorac identity", async () => {
+  const seo = await read("src/app/seo.ts");
+  const layout = await read("src/app/layout.tsx");
+  const home = await read("src/app/page.tsx");
+  const privacy = await read("src/app/privacy/page.tsx");
+  const terms = await read("src/app/terms/page.tsx");
+  const analyzer = await read("src/app/analyzer.tsx");
+  const legacyLanding = await read("src/app/tiktok-landing.tsx");
+  const legacyDownloader = await read("src/app/tiktok-downloader/page.tsx");
+  const socialImage = await read("public/branding/vidorac-og.svg");
+  const publicCopy = `${seo}\n${layout}\n${home}\n${privacy}\n${terms}\n${analyzer}\n${legacyLanding}\n${legacyDownloader}\n${socialImage}`;
+
+  assert.match(seo, /SITE_URL = "https:\/\/vidorac\.com"/);
+  assert.match(home, /openGraph:/);
+  assert.match(home, /twitter:/);
+  assert.match(seo, /function informationMetadata[\s\S]*twitter:/);
+  assert.match(privacy, /expire after 10 minutes/);
+  for (const platform of ["TikTok", "Instagram", "Facebook", "Reddit", "X"]) {
+    assert.match(privacy, new RegExp(platform));
+    assert.match(terms, new RegExp(platform));
+  }
+  assert.doesNotMatch(publicCopy, /vidorac\.pages\.dev|\bbeta\b|approximately 15 minutes/i);
+  assert.doesNotMatch(layout, /\bGeist\s*[,}]/);
+  assert.doesNotMatch(layout, /geistSans|--font-geist-sans/);
+});

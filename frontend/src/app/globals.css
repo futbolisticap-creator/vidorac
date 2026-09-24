@@ -22,7 +22,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--text);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-home-sans);
   --font-mono: var(--font-geist-mono);
 }
 
@@ -38,7 +38,7 @@ body {
   overflow-x: hidden;
   background: var(--background);
   color: var(--text);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-home-sans), Arial, Helvetica, sans-serif;
 }
 
 button,
@@ -1759,7 +1759,7 @@ button { -webkit-tap-highlight-color: transparent; }
   width: min(calc(100% - 2rem), 73.75rem);
   min-width: 0;
   margin-inline: auto;
-  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-family: var(--font-home-sans), Arial, Helvetica, sans-serif;
 }
 
 .home-ad-rail { display: none; }
@@ -1789,7 +1789,7 @@ button { -webkit-tap-highlight-color: transparent; }
   max-width: 58rem;
   flex-direction: column;
   margin-top: 1.35rem;
-  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-family: var(--font-home-sans), Arial, Helvetica, sans-serif;
   font-size: clamp(3.2rem, 7vw, 5.8rem);
   font-weight: 760;
   letter-spacing: -0.072em;
@@ -2121,7 +2121,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* Shared editorial typography for every downloader page */
 .platform-page {
-  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-family: var(--font-home-sans), Arial, Helvetica, sans-serif;
 }
 
 .downloader-hero-heading {
@@ -2136,7 +2136,7 @@ button { -webkit-tap-highlight-color: transparent; }
   max-width: 62rem;
   flex-direction: column;
   margin: 1rem auto 0;
-  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-family: var(--font-home-sans), Arial, Helvetica, sans-serif;
   font-size: clamp(2.7rem, 5.8vw, 4.75rem);
   font-weight: 760;
   letter-spacing: -0.066em;
@@ -2180,7 +2180,7 @@ button { -webkit-tap-highlight-color: transparent; }
   flex-direction: column;
   margin-top: 0.5rem;
   color: var(--text);
-  font-family: var(--font-home-sans), var(--font-geist-sans), sans-serif;
+  font-family: var(--font-home-sans), Arial, Helvetica, sans-serif;
   font-size: clamp(1.65rem, 3vw, 2.35rem);
   font-weight: 720;
   letter-spacing: -0.045em;
@@ -2411,14 +2411,14 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .serif-action-label {
-  font-family: var(--font-home-serif), Georgia, serif;
-  font-size: 1.05rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
   font-style: normal;
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   line-height: 1;
 }
 
 @media (max-width: 390px) {
-  .serif-action-label { font-size: 1rem; }
+  .serif-action-label { font-size: 14px; }
 }

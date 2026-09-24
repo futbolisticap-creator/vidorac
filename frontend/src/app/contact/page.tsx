@@ -4,7 +4,7 @@ import { informationMetadata } from "../seo";
 import ContactForm from "./contact-form";
 
 export const metadata = informationMetadata({
-  title: "Contact Vidorac | Vidorac Beta",
+  title: "Contact Vidorac",
   description: "Contact Vidorac with questions, feedback, bug reports, copyright concerns or general enquiries.",
   slug: "contact",
 });

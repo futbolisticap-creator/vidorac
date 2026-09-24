@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Geist, Geist_Mono, Instrument_Serif, Manrope } from "next/font/google";
+import { Geist_Mono, Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
 import SiteHeader from "./site-header";
 import { DonationProvider } from "./donation-modal";
 import { getSupportUrl } from "./support-config";
-import { OG_IMAGE_PATH, SITE_URL } from "./seo";
+import { OG_IMAGE_ALT, OG_IMAGE_PATH, SITE_URL } from "./seo";
 import { TelegramTopBar } from "./telegram-promotion";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -33,7 +28,7 @@ const homeSerif = Instrument_Serif({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Vidorac - Free Video Downloader",
+    default: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
     template: "%s — Vidorac",
   },
   description: "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.",
@@ -47,16 +42,16 @@ export const metadata: Metadata = {
     shortcut: "/branding/vidorac-icon.svg",
   },
   openGraph: {
-    title: "Vidorac - Free Video Downloader",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
     description: "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.",
     url: "/",
     siteName: "Vidorac",
     type: "website",
-    images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: "Vidorac public beta" }],
+    images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: OG_IMAGE_ALT }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vidorac - Free Video Downloader",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
     description: "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.",
     images: [OG_IMAGE_PATH],
   },
@@ -66,7 +61,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${homeSans.variable} ${homeSerif.variable} h-full antialiased`}
+      className={`${geistMono.variable} ${homeSans.variable} ${homeSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <DonationProvider supportUrl={getSupportUrl()}>

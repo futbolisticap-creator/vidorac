@@ -4,7 +4,7 @@ import { informationMetadata } from "../seo";
 
 export const metadata = informationMetadata({
   title: "Privacy Policy | Vidorac",
-  description: "Learn what information Vidorac may process, how temporary media is handled and which third-party services help operate the public beta.",
+  description: "Learn what information Vidorac may process, how temporary media is handled and which third-party services help operate the service.",
   slug: "privacy",
 });
 
@@ -13,7 +13,7 @@ export default function PrivacyPage() {
     <InformationPage
       eyebrow="Legal"
       title="Privacy Policy"
-      intro="This policy explains how Vidorac currently handles information when you use the public beta."
+      intro="This policy explains how Vidorac currently handles information when you use the service."
     >
       <p className="information-updated">Last updated: September 2026</p>
 
@@ -39,7 +39,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>Temporary media and downloads</h2>
-        <p>Files prepared by the backend are temporary and are generated only to complete a requested download or media operation. They are removed after delivery when applicable, after failed processing, or by automatic cleanup. Prepared download identifiers currently expire after approximately 15 minutes.</p>
+        <p>Files prepared by the backend are temporary and are generated only to complete a requested download or media operation. They are removed after delivery when applicable, after failed processing, or by automatic cleanup. Prepared download identifiers currently expire after 10 minutes.</p>
       </section>
 
       <section>
@@ -55,7 +55,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>External platforms</h2>
-        <p>Vidorac processes public TikTok URLs to analyze available videos, photo slideshows and audio. Vidorac is not affiliated with TikTok or ByteDance, and their own terms and privacy policies continue to apply.</p>
+        <p>Vidorac processes public links from supported platforms—TikTok, Instagram, Facebook, Reddit and X—to identify media and available formats. Vidorac is independent and is not affiliated with or endorsed by those platforms; their terms and privacy policies continue to apply.</p>
       </section>
 
       <section>

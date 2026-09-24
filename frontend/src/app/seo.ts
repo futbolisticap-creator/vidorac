@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = "https://vidorac.pages.dev";
+export const SITE_URL = "https://vidorac.com";
 export const OG_IMAGE_PATH = "/branding/vidorac-og.png";
+export const OG_IMAGE_ALT = "Vidorac video downloader for supported social platforms";
 
 export type PlatformSlug =
   | "tiktok"
@@ -47,7 +48,7 @@ export function platformMetadata({
       url,
       siteName: "Vidorac",
       type: "website",
-      images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: "Vidorac public beta" }],
+      images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: OG_IMAGE_ALT }],
     },
     twitter: {
       card: "summary_large_image",
@@ -78,7 +79,13 @@ export function informationMetadata({
       url,
       siteName: "Vidorac",
       type: "website",
-      images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: "Vidorac public beta" }],
+      images: [{ url: OG_IMAGE_PATH, width: 1200, height: 630, alt: OG_IMAGE_ALT }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [OG_IMAGE_PATH],
     },
   };
 }

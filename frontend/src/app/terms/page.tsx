@@ -4,7 +4,7 @@ import { informationMetadata } from "../seo";
 
 export const metadata = informationMetadata({
   title: "Terms of Use | Vidorac",
-  description: "Read the terms that apply when using Vidorac to process publicly accessible TikTok media.",
+  description: "Read the terms that apply when using Vidorac to process publicly accessible media from supported platforms.",
   slug: "terms",
 });
 
@@ -13,13 +13,13 @@ export default function TermsPage() {
     <InformationPage
       eyebrow="Legal"
       title="Terms of Use"
-      intro="These terms describe the responsible use of Vidorac during its public beta."
+      intro="These terms describe the responsible use of Vidorac."
     >
       <p className="information-updated">Last updated: September 2026</p>
 
       <section>
         <h2>Service</h2>
-        <p>Vidorac is a public beta tool for processing publicly accessible TikTok videos, photo slideshows and audio.</p>
+        <p>Vidorac is a tool for processing publicly accessible media from supported platforms, including TikTok, Instagram, Facebook, Reddit and X.</p>
       </section>
 
       <section>
@@ -39,12 +39,12 @@ export default function TermsPage() {
 
       <section>
         <h2>Third-party platforms</h2>
-        <p>Vidorac is not affiliated with TikTok or ByteDance. Their trademarks belong to their respective owners, and use of TikTok remains subject to its applicable terms.</p>
+        <p>Vidorac is independent and is not affiliated with or endorsed by TikTok, Instagram, Facebook, Reddit, X or their owners. Their trademarks belong to their respective owners, and use of each platform remains subject to its applicable terms.</p>
       </section>
 
       <section>
         <h2>Availability</h2>
-        <p>Vidorac is currently a beta service. Availability is not guaranteed, and TikTok changes may temporarily affect supported formats or qualities. The service may be changed, interrupted or unavailable while improvements are made.</p>
+        <p>Availability is not guaranteed, and changes made by supported platforms may temporarily affect formats or qualities. The service may be changed, interrupted or unavailable while improvements are made.</p>
       </section>
 
       <section>
@@ -54,12 +54,12 @@ export default function TermsPage() {
 
       <section>
         <h2>No warranty</h2>
-        <p>Vidorac is provided as a public beta without guarantees of uninterrupted or error-free availability. We aim to keep the service useful and reliable, but cannot promise that every source, platform or format will always work.</p>
+        <p>Vidorac is provided without guarantees of uninterrupted or error-free availability. We aim to keep the service useful and reliable, but cannot promise that every source, platform or format will always work.</p>
       </section>
 
       <section>
         <h2>Changes</h2>
-        <p>Vidorac may update the service and these Terms as the beta develops. The latest revision date will be shown on this page.</p>
+        <p>Vidorac may update the service and these Terms as the service develops. The latest revision date will be shown on this page.</p>
       </section>
 
       <section>
