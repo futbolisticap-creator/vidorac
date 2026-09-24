@@ -1,4 +1,4 @@
-export const CONTACT_EMAIL = "footyhub.es@gmail.com";
+export const CONTACT_EMAIL = "vidorac.ai@gmail.com";
 export const CONTACT_MAILTO = `mailto:${CONTACT_EMAIL}`;
 
 export function getContactFormEndpoint(): string | null {

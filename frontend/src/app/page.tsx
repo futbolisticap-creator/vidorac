@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AdPlaceholder from "./ad-placeholder";
+import PlatformBrandIcon from "./platform-brand-icon";
 import { platformConfigs, platformOrder } from "./platform-config";
 import SiteFooter from "./site-footer";
 import { SITE_URL } from "./seo";
@@ -46,7 +47,7 @@ export default function Home() {
             const platform = platformConfigs[id];
             return (
               <article key={id} className={`hub-platform-card hub-platform-${id}`}>
-                <div className="platform-card-icon" aria-hidden="true">{platform.name.slice(0, 1)}</div>
+                <PlatformBrandIcon platform={id} />
                 <div><p className="section-label">{platform.name}</p><h3>{platform.title}</h3><p>{platform.cardDescription}</p></div>
                 <Link href={platform.path} aria-label={`Open ${platform.name} Downloader`}><span>Open downloader</span><span aria-hidden="true">↗</span></Link>
               </article>

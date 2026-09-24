@@ -24,7 +24,7 @@ export default function SiteFooter() {
           <p>© {new Date().getFullYear()} Vidorac</p>
           <p>Only download content you own or have permission to use.</p>
         </div>
-        <p className="footer-legal">Vidorac is an independent service and is not affiliated with the supported platforms. Their trademarks belong to their respective owners. Users are responsible for ensuring they have permission to download and use content.</p>
+        <p className="footer-legal">Vidorac is an independent service and is not affiliated with, endorsed by, or sponsored by TikTok, Instagram, Facebook, Reddit, or X. Their trademarks belong to their respective owners. Users are responsible for ensuring they have permission to download and use content.</p>
       </div>
     </footer>
   );

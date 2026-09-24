@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { platformConfigs, platformOrder } from "./platform-config";
+import SupportButton from "./support-button";
 
 export default function SiteHeader() {
   return (
@@ -10,23 +10,22 @@ export default function SiteHeader() {
           <Image src="/branding/vidorac-logo.svg" alt="" width={132} height={34} className="brand-logo" priority />
         </Link>
 
-        <div className="primary-nav-desktop ml-auto items-center gap-1 text-sm text-[var(--text-muted)]">
+        <div className="primary-nav-desktop ml-auto items-center gap-2 text-sm text-[var(--text-muted)]">
           <Link href="/" className="header-link header-home-link">Home</Link>
-          {platformOrder.map((id) => <Link key={id} href={platformConfigs[id].path} className="header-link">{platformConfigs[id].name}</Link>)}
           <Link href="/contact" className="header-link header-contact-link">Contact</Link>
+          <SupportButton variant="header" />
         </div>
 
         <details className="primary-nav-mobile ml-auto">
           <summary aria-label="Open navigation menu">
-            <span>Menu</span>
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none">
               <path d="M4 6.5h12M4 10h12M4 13.5h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
           </summary>
           <div className="mobile-nav-panel">
             <Link href="/" className="header-link">Home</Link>
-            {platformOrder.map((id) => <Link key={id} href={platformConfigs[id].path} className="header-link">{platformConfigs[id].name}</Link>)}
             <Link href="/contact" className="header-link">Contact</Link>
+            <SupportButton variant="header" />
           </div>
         </details>
       </nav>
