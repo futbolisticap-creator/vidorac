@@ -86,3 +86,17 @@ test("public contact email and mailto use the Vidorac address", async () => {
   assert.match(config, /CONTACT_MAILTO = `mailto:\$\{CONTACT_EMAIL\}`/);
   assert.doesNotMatch(config, /footyhub/i);
 });
+
+test("Telegram promotion is visible, safe and limited to normal links", async () => {
+  const layout = await read("src/app/layout.tsx");
+  const home = await read("src/app/page.tsx");
+  const footer = await read("src/app/site-footer.tsx");
+  const telegram = await read("src/app/telegram-promotion.tsx");
+  assert.match(layout, /<TelegramTopBar \/>/);
+  assert.match(home, /<TelegramHomepageCard \/>/);
+  assert.match(footer, /Telegram Updates/);
+  assert.match(telegram, /TELEGRAM_URL = "https:\/\/t\.me\/Vidoracc"/);
+  assert.match(telegram, /target: "_blank"/);
+  assert.match(telegram, /rel: "noopener noreferrer"/);
+  assert.doesNotMatch(telegram, /script|iframe|analytics/i);
+});

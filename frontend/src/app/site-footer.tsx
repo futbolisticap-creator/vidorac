@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { platformConfigs, platformOrder } from "./platform-config";
+import { TELEGRAM_URL, TelegramIcon } from "./telegram-promotion";
 
 export default function SiteFooter() {
   return (
@@ -13,12 +14,21 @@ export default function SiteFooter() {
             </div>
             <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Focused public-media downloaders for TikTok, Instagram, Facebook, Reddit and X.</p>
           </div>
-          <nav aria-label="Footer navigation" className="footer-links">
-            {platformOrder.map((id) => <Link key={id} href={platformConfigs[id].path}>{platformConfigs[id].name}</Link>)}
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-            <Link href="/contact">Contact</Link>
-          </nav>
+          <div className="footer-navigation-groups">
+            <nav aria-label="Footer navigation" className="footer-links">
+              {platformOrder.map((id) => <Link key={id} href={platformConfigs[id].path}>{platformConfigs[id].name}</Link>)}
+              <Link href="/privacy">Privacy</Link>
+              <Link href="/terms">Terms</Link>
+              <Link href="/contact">Contact</Link>
+            </nav>
+            <div className="footer-community">
+              <p>Community</p>
+              <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Join Vidorac Telegram channel">
+                <TelegramIcon />
+                <span>Telegram Updates</span>
+              </a>
+            </div>
+          </div>
         </div>
         <div className="footer-bottom">
           <p>© {new Date().getFullYear()} Vidorac</p>

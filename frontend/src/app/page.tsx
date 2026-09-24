@@ -4,6 +4,7 @@ import PlatformBrandIcon from "./platform-brand-icon";
 import { platformConfigs, platformOrder } from "./platform-config";
 import SiteFooter from "./site-footer";
 import { SITE_URL } from "./seo";
+import { TelegramHomepageCard } from "./telegram-promotion";
 
 const reasons = [
   ["Focused by platform", "Every downloader accepts only its matching links, keeping the experience clear."],
@@ -67,6 +68,10 @@ export default function Home() {
         <div className="compact-section-heading"><div><p className="section-label">FAQ</p><h2 id="home-faq-title">Good to know</h2></div></div>
         <div className="faq-list compact-faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</div>
       </section>
+
+      <div className="telegram-home-section">
+        <TelegramHomepageCard />
+      </div>
 
       <SiteFooter />
     </main>

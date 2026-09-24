@@ -6,6 +6,7 @@ import SiteHeader from "./site-header";
 import { DonationProvider } from "./donation-modal";
 import { getSupportUrl } from "./support-config";
 import { OG_IMAGE_PATH, SITE_URL } from "./seo";
+import { TelegramTopBar } from "./telegram-promotion";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-full flex flex-col">
         <DonationProvider supportUrl={getSupportUrl()}>
           <SiteHeader />
+          <TelegramTopBar />
           {children}
         </DonationProvider>
       </body>
