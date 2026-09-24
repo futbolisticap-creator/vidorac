@@ -4,16 +4,21 @@ import json
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import sync_playwright
 
 
-TARGET_URL = os.environ.get("VIDORAC_TEST_URL", "http://localhost:3000/")
+CONFIGURED_URL = os.environ.get("VIDORAC_TEST_URL", "http://localhost:3000/")
+PARSED_URL = urlsplit(CONFIGURED_URL)
+SITE_ORIGIN = urlunsplit((PARSED_URL.scheme, PARSED_URL.netloc, "", "", "")).rstrip("/")
+HOME_URL = f"{SITE_ORIGIN}/"
+TIKTOK_DOWNLOADER_URL = f"{SITE_ORIGIN}/tiktok"
 TIKTOK_URL = "https://www.tiktok.com/@example/video/1234567890123456789"
-UNSUPPORTED_URLS = (
-    "https://www.instagram.com/reel/ABC123/",
-    "https://youtu.be/example",
-    "https://www.reddit.com/r/videos/comments/abc123/example/",
+PLATFORM_ISOLATION_CASES = (
+    ("https://www.instagram.com/reel/ABC123/", "We detected a Instagram link. Open the Instagram Downloader instead."),
+    ("https://youtu.be/example", "This is not a supported TikTok URL."),
+    ("https://www.reddit.com/r/videos/comments/abc123/example/", "We detected a Reddit link. Open the Reddit Downloader instead."),
 )
 VIEWPORTS = (
     ("chrome-375", 375, 812, None),
@@ -28,7 +33,10 @@ VIEWPORTS = (
     ("chrome-393", 393, 852, None),
     ("chrome-430", 430, 932, None),
     ("tablet-768", 768, 1024, None),
+    ("desktop-1024", 1024, 900, None),
+    ("desktop-1280", 1280, 900, None),
     ("desktop-1440", 1440, 1000, None),
+    ("desktop-1920", 1920, 1080, None),
     (
         "safari-emulation-390",
         390,
@@ -48,8 +56,13 @@ VIDEO_RESPONSE = {
         "platform": "tiktok",
         "webpage_url": TIKTOK_URL,
         "max_height": 1080,
+        "source_audio_codec": "AAC",
+        "source_audio_bitrate_kbps": 128,
+        "source_audio_sample_rate_hz": 44_100,
+        "source_audio_channels": 2,
         "quality_options": [
             {"id": "best", "label": "Best Quality", "available": True, "resolution": "1080p", "container": "MP4", "video_codec": "H.264", "estimated_size_bytes": 10_000_000},
+            {"id": "audio", "label": "Original / Best Audio", "available": True, "resolution": None, "container": "M4A", "video_codec": None, "estimated_size_bytes": 900_000},
             {"id": "mp3", "label": "MP3", "available": True, "resolution": None, "container": "MP3", "video_codec": None, "estimated_size_bytes": 1_000_000},
         ],
     },
@@ -106,12 +119,15 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
 
     page.route("**/api/download/prepare", hold_prepare)
 
-    page.goto(TARGET_URL, wait_until="networkidle")
+    page.goto(HOME_URL, wait_until="networkidle")
     assert page.locator("#kofiframe").count() == 0, f"{name}: Ko-fi iframe loaded before user intent"
     assert page.get_by_test_id("analyze-result-support").count() == 0, f"{name}: result support appeared on initial load"
-    assert page.get_by_test_id("home-support-cta").count() == 1, f"{name}: homepage support CTA is missing"
-    home_support_button = page.get_by_test_id("home-support-cta").get_by_role("button", name="Open the Vidorac donation panel")
-    assert home_support_button.is_visible()
+    assert page.locator("#media-url").count() == 0, f"{name}: analyzer remained on the homepage"
+    page.get_by_role("heading", name="Download videos from your favorite platforms").wait_for()
+    page.get_by_role("heading", name="Choose where your link comes from").wait_for()
+    platform_hub = page.locator('section[aria-labelledby="platforms-title"]')
+    for route in ("/tiktok", "/instagram", "/facebook", "/reddit", "/x"):
+        assert platform_hub.locator(f'a[href="{route}"]').count() == 1, f"{name}: homepage hub is missing {route}"
     header = page.locator("header.site-header")
     footer = page.locator("footer.site-footer")
     assert header.locator('a[href="/tiktok-downloader"]').count() == 0, f"{name}: TikTok guide remained in primary navigation"
@@ -164,6 +180,9 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
         assert dialog.count() == 0
         assert donate_button.evaluate("element => document.activeElement === element"), f"{name}: focus was not restored to desktop Donate"
 
+    page.goto(TIKTOK_DOWNLOADER_URL, wait_until="networkidle")
+    page.locator("#media-url").wait_for()
+    page.get_by_role("heading", name="TikTok Video Downloader").wait_for()
     assert page.get_by_text("Vidorac Diagnostics", exact=True).count() == 0
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
@@ -176,7 +195,9 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.get_by_test_id("donation-modal-backdrop").click(position={"x": 3, "y": 3})
     assert result_dialog.count() == 0, f"{name}: backdrop click did not close donation modal"
     assert result_support_button.evaluate("element => document.activeElement === element"), f"{name}: result CTA focus was not restored"
-    page.get_by_role("button", name="Download MP3").wait_for()
+    page.get_by_role("button", name=re.compile(r"^Download MP3")).wait_for()
+    page.get_by_role("button", name=re.compile(r"^Original \/ Best Audio")).wait_for()
+    page.get_by_text("Source audio: AAC · ~128 kbps · 44.1 kHz · 2 ch", exact=True).wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
     assert len(analyze_requests) == 1, f"{name}: TikTok did not call /api/analyze exactly once"
     assert analyze_requests[0]["url"] == TIKTOK_URL
@@ -184,6 +205,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
 
     bitrate_128 = page.get_by_role("button", name="128 kbps Small")
     bitrate_192 = page.get_by_role("button", name="192 kbps Recommended")
+    bitrate_256 = page.get_by_role("button", name="256 kbps Larger")
     bitrate_320 = page.get_by_role("button", name="320 kbps High")
     assert bitrate_192.get_attribute("aria-pressed") == "true", f"{name}: 192 kbps is not selected by default"
     bitrate_128.click()
@@ -192,10 +214,10 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: 320 kbps selection failed"
     assert len(analyze_requests) == 1, f"{name}: changing MP3 bitrate repeated analysis"
 
-    page.get_by_role("button", name="Download MP3").click()
+    page.get_by_role("button", name=re.compile(r"^Download MP3")).click()
     page.wait_for_timeout(100)
     assert len(pending_prepare_routes) == 1, f"{name}: MP3 preparation was not requested"
-    assert bitrate_128.is_disabled() and bitrate_192.is_disabled() and bitrate_320.is_disabled(), f"{name}: bitrate controls stayed enabled during preparation"
+    assert bitrate_128.is_disabled() and bitrate_192.is_disabled() and bitrate_256.is_disabled() and bitrate_320.is_disabled(), f"{name}: bitrate controls stayed enabled during preparation"
     assert prepare_requests[0]["audio_bitrate"] == 320, f"{name}: selected MP3 bitrate was not sent"
     pending_prepare_routes[0].fulfill(
         status=500,
@@ -209,10 +231,10 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     console_errors.clear()  # The intentional HTTP 500 above is expected to reach the browser console.
 
     page.get_by_role("button", name="Download another").click()
-    for unsupported_url in UNSUPPORTED_URLS:
+    for unsupported_url, expected_error in PLATFORM_ISOLATION_CASES:
         page.fill("#media-url", unsupported_url)
         page.click("button[type=submit]")
-        page.locator("#analyze-error").get_by_text("TikTok links only", exact=False).wait_for()
+        page.locator("#analyze-error").get_by_text(expected_error, exact=True).wait_for()
     assert len(analyze_requests) == 1, f"{name}: unsupported platform called /api/analyze"
 
     page.get_by_role("button", name="Paste TikTok URL from clipboard").click()
@@ -240,7 +262,7 @@ def run_idle_state_case(browser) -> None:
     page_errors: list[str] = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.route("**/api/analyze", lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE)))
-    page.goto(TARGET_URL, wait_until="networkidle")
+    page.goto(TIKTOK_DOWNLOADER_URL, wait_until="networkidle")
 
     status = page.get_by_test_id("analysis-status")
     analyze_spinner = page.get_by_test_id("analyze-spinner")
@@ -280,8 +302,10 @@ def run_donation_fallback_case(browser) -> None:
     page_errors: list[str] = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     page.route(re.compile(r"^https://ko-fi\.com/vidorac/"), lambda route: route.abort("failed"))
-    page.goto(TARGET_URL, wait_until="networkidle")
-    page.get_by_test_id("home-support-cta").get_by_role("button", name="Open the Vidorac donation panel").click()
+    page.goto(HOME_URL, wait_until="networkidle")
+    mobile_nav = page.locator("header.site-header .primary-nav-mobile")
+    mobile_nav.locator("summary").click()
+    mobile_nav.get_by_role("button", name="Open the Vidorac donation panel").click()
     dialog = page.get_by_role("dialog", name="Support Vidorac")
     dialog.wait_for()
     fallback = dialog.get_by_role("link", name="Open Ko-fi")
@@ -301,7 +325,7 @@ def run_debug_failure_cases(browser) -> None:
         "if (globalThis.crypto) { try { Object.defineProperty(globalThis.crypto, 'randomUUID', { configurable: true, value: undefined }); } catch {} }"
     )
     page = context.new_page()
-    debug_url = f"{TARGET_URL.rstrip('/')}?debug=1"
+    debug_url = f"{TIKTOK_DOWNLOADER_URL}?debug=1"
     page.goto(debug_url, wait_until="networkidle")
     page.get_by_text("Vidorac Diagnostics", exact=True).wait_for()
     page.get_by_text("Vidorac Diagnostics", exact=True).click()
@@ -339,7 +363,7 @@ def run_debug_failure_cases(browser) -> None:
         lambda route: route.fulfill(status=503, content_type="application/json", body=json.dumps({"success": False, "detail": "Service temporarily unavailable"})),
     )
     page.click("button[type=submit]")
-    page.get_by_text("This TikTok could not be accessed. It may be private, removed, or temporarily unavailable.", exact=True).wait_for()
+    page.get_by_text("Service temporarily unavailable", exact=True).wait_for()
     page.get_by_text("API response status: 503", exact=False).wait_for()
     page.get_by_text("Analyzer stage: http-error", exact=False).wait_for()
     page.get_by_text("JSON parse: success", exact=False).wait_for()
@@ -377,7 +401,7 @@ def run_debug_failure_cases(browser) -> None:
         lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(without_audio)),
     )
     page.click("button[type=submit]")
-    page.get_by_text("MP3 is not available for this TikTok.", exact=True).wait_for()
+    page.get_by_text("MP3 is not available for this TikTok post.", exact=True).wait_for()
     page.get_by_text("Analyzer stage: result-rendered", exact=False).wait_for()
 
     report = page.locator("details pre").inner_text()
@@ -399,7 +423,7 @@ def run_abort_controller_rerender_case(browser) -> None:
     page = context.new_page()
     page_errors: list[str] = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
-    page.goto(TARGET_URL, wait_until="networkidle")
+    page.goto(TIKTOK_DOWNLOADER_URL, wait_until="networkidle")
     page.clock.install()
     page.evaluate(
         """
@@ -496,7 +520,7 @@ def run_immediate_failure_retry_case(browser) -> None:
             route.fulfill(status=200, content_type="application/json", body=json.dumps(VIDEO_RESPONSE))
 
     page.route("**/api/analyze", analyze_route)
-    page.goto(TARGET_URL, wait_until="networkidle")
+    page.goto(TIKTOK_DOWNLOADER_URL, wait_until="networkidle")
     page.fill("#media-url", TIKTOK_URL)
     button = page.locator('button[type="submit"]')
     button.evaluate("element => { window.__stableAnalyzeButton = element; }")
@@ -536,7 +560,7 @@ def run_mp3_download_transition_matrix(browser) -> None:
 
     page.route("**/api/download/prepare", prepare_route)
     page.route("**/api/download/test-*", lambda route: route.fulfill(status=200, content_type="audio/mpeg", headers={"Content-Disposition": "attachment; filename=test.mp3"}, body="test-audio"))
-    page.goto(f"{TARGET_URL.rstrip('/')}?debug=1", wait_until="networkidle")
+    page.goto(f"{TIKTOK_DOWNLOADER_URL}?debug=1", wait_until="networkidle")
     page.clock.install()
     page.fill("#media-url", TIKTOK_URL)
     page.click("button[type=submit]")
@@ -592,11 +616,12 @@ def run_mp3_download_transition_matrix(browser) -> None:
     assert_mp3_nodes_stable()
     assert not native_download_requests
     page.clock.fast_forward(2_400)
-    label.get_by_text("Download MP3", exact=True).wait_for()
+    label.get_by_text(re.compile(r"^Download MP3")).wait_for()
     page.evaluate("() => { HTMLAnchorElement.prototype.click = window.__nativeAnchorClick; }")
 
-    for bitrate in (128, 192, 320):
-        page.get_by_role("button", name=f"{bitrate} kbps" + (" Small" if bitrate == 128 else " Recommended" if bitrate == 192 else " High")).click()
+    descriptions = {128: "Small", 192: "Recommended", 256: "Larger", 320: "High"}
+    for bitrate in (128, 192, 256, 320):
+        page.get_by_role("button", name=f"{bitrate} kbps {descriptions[bitrate]}").click()
         button.click()
         label.get_by_text("MP3 ready", exact=True).wait_for()
         assert_mp3_nodes_stable()
@@ -606,10 +631,10 @@ def run_mp3_download_transition_matrix(browser) -> None:
         page.get_by_text("Vidorac Diagnostics", exact=True).locator("..").evaluate("element => { element.open = true; }")
         page.get_by_text("Download stage: mp3-download-triggered", exact=False).wait_for()
         page.clock.fast_forward(2_400)
-        label.get_by_text("Download MP3", exact=True).wait_for()
+        label.get_by_text(re.compile(r"^Download MP3")).wait_for()
         assert_mp3_nodes_stable()
 
-    assert [body["audio_bitrate"] for body in prepare_bodies[-3:]] == [128, 192, 320]
+    assert [body["audio_bitrate"] for body in prepare_bodies[-4:]] == [128, 192, 256, 320]
     best_label = page.get_by_test_id("quality-best-label")
     best_button = best_label.locator("xpath=../..").first
     best_button.evaluate("element => { window.__stableBestButton = element; }")
@@ -629,7 +654,7 @@ def run_mp3_download_transition_matrix(browser) -> None:
     page.clock.fast_forward(350)
     label.get_by_text("Download started", exact=True).wait_for()
     assert_mp3_nodes_stable()
-    assert len(native_download_requests) == 5
+    assert len(native_download_requests) == 6
     assert not page_errors, page_errors
     context.close()
 

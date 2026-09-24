@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
 import SiteHeader from "./site-header";
 import { DonationProvider } from "./donation-modal";
@@ -16,6 +16,18 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const homeSans = Manrope({
+  variable: "--font-home-sans",
+  subsets: ["latin"],
+});
+
+const homeSerif = Instrument_Serif({
+  variable: "--font-home-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -54,7 +66,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${homeSans.variable} ${homeSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <DonationProvider supportUrl={getSupportUrl()}>

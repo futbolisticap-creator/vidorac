@@ -18,6 +18,7 @@ from app.analyzer import (
     analyze_media,
     analyze_content,
     build_quality_options,
+    extract_source_audio_metadata,
     extract_max_height,
     ensure_individual_media_url,
     normalize_url_for_extraction,
@@ -410,15 +411,44 @@ class MetadataTests(unittest.TestCase):
 
         self.assertTrue(options["best"]["available"])
         self.assertTrue(options["compatible"]["available"])
-        self.assertTrue(options["1080"]["available"])
-        self.assertEqual(options["1080"]["resolution"], "720p")
+        self.assertNotIn("1080", options)
         self.assertTrue(options["720"]["available"])
+        self.assertEqual(options["720"]["label"], "720p")
         self.assertEqual(options["720"]["resolution"], "720p")
         self.assertEqual(options["720"]["estimated_size_bytes"], 14_000_000)
         self.assertEqual(options["compatible"]["container"], "MP4")
         self.assertEqual(options["compatible"]["video_codec"], "H.264")
         self.assertTrue(options["mp3"]["available"])
         self.assertEqual(options["mp3"]["container"], "MP3")
+        self.assertTrue(options["audio"]["available"])
+        self.assertEqual(options["audio"]["container"], "M4A")
+
+    def test_source_audio_metadata_keeps_extractor_bitrate_separate(self) -> None:
+        metadata = extract_source_audio_metadata(
+            {
+                "formats": [
+                    {
+                        "vcodec": "none",
+                        "acodec": "mp4a.40.2",
+                        "ext": "m4a",
+                        "abr": 127.6,
+                        "asr": 44_100,
+                        "audio_channels": 2,
+                    }
+                ]
+            }
+        )
+        self.assertEqual(metadata["source_audio_codec"], "AAC")
+        self.assertEqual(metadata["source_audio_bitrate_kbps"], 128)
+        self.assertEqual(metadata["source_audio_sample_rate_hz"], 44_100)
+        self.assertEqual(metadata["source_audio_channels"], 2)
+
+    def test_unknown_source_audio_bitrate_remains_unknown(self) -> None:
+        metadata = extract_source_audio_metadata(
+            {"formats": [{"vcodec": "none", "acodec": "opus", "ext": "webm"}]}
+        )
+        self.assertEqual(metadata["source_audio_codec"], "Opus")
+        self.assertIsNone(metadata["source_audio_bitrate_kbps"])
 
     def test_unknown_sizes_are_returned_as_null(self) -> None:
         options = build_quality_options(
@@ -460,7 +490,7 @@ class MetadataTests(unittest.TestCase):
         self.assertTrue(options["best"]["available"])
         self.assertTrue(options["1080"]["available"])
         self.assertTrue(options["720"]["available"])
-        self.assertFalse(options["480"]["available"])
+        self.assertNotIn("480", options)
         self.assertTrue(options["mp3"]["available"])
         self.assertEqual(options["1080"]["resolution"], "1080p")
         self.assertEqual(options["1080"]["container"], "MP4")
@@ -477,8 +507,8 @@ class MetadataTests(unittest.TestCase):
 
         self.assertTrue(options["1080"]["available"])
         self.assertEqual(options["1080"]["resolution"], "1080p")
-        self.assertFalse(options["720"]["available"])
-        self.assertFalse(options["480"]["available"])
+        self.assertNotIn("720", options)
+        self.assertNotIn("480", options)
 
     def test_vp9_and_opus_separate_streams_are_available(self) -> None:
         info = {
@@ -531,7 +561,7 @@ class MetadataTests(unittest.TestCase):
         self.assertIsNone(options["best"]["resolution"])
         self.assertEqual(options["best"]["container"], "MP4")
         self.assertFalse(options["mp3"]["available"])
-        self.assertFalse(options["1080"]["available"])
+        self.assertNotIn("1080", options)
 
     def test_best_quality_keeps_av1_while_best_mp4_prefers_h264_aac(self) -> None:
         info = {
@@ -563,8 +593,9 @@ class MetadataTests(unittest.TestCase):
             options = {option["id"]: option for option in build_quality_options(info)}
 
         self.assertTrue(options["1080"]["available"])
+        self.assertEqual(options["1080"]["label"], "900p")
         self.assertEqual(options["1080"]["resolution"], "900p")
-        self.assertFalse(options["720"]["available"])
+        self.assertNotIn("720", options)
 
     def test_bitrate_only_size_estimate_does_not_disable_a_quality(self) -> None:
         info = {

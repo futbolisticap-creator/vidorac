@@ -43,12 +43,14 @@ class DownloadQuality(str, Enum):
     HD_1080 = "1080"
     HD_720 = "720"
     SD_480 = "480"
+    ORIGINAL_AUDIO = "audio"
     MP3 = "mp3"
 
 
 class Mp3Bitrate(int, Enum):
     KBPS_128 = 128
     KBPS_192 = 192
+    KBPS_256 = 256
     KBPS_320 = 320
 
 
@@ -334,8 +336,8 @@ def build_ydl_options(
         "progress_hooks": [progress_hook],
     }
 
-    if quality is DownloadQuality.MP3:
-        if not ffmpeg_available:
+    if quality in {DownloadQuality.MP3, DownloadQuality.ORIGINAL_AUDIO}:
+        if quality is DownloadQuality.MP3 and not ffmpeg_available:
             raise FFmpegRequiredError
         options.update(
             {
@@ -387,13 +389,15 @@ def download_media(
                 temp_directory,
                 audio_bitrate or DEFAULT_MP3_BITRATE,
             )
+        elif quality is DownloadQuality.ORIGINAL_AUDIO:
+            output_path = _find_downloaded_audio_source(temp_directory)
         else:
             output_path = _find_output_file(temp_directory, quality)
         if output_path.stat().st_size > MAX_FILESIZE_BYTES:
             raise FileSizeLimitError
 
         extension = output_path.suffix.lower().lstrip(".") or ("mp3" if quality is DownloadQuality.MP3 else "mp4")
-        if quality is DownloadQuality.MP3:
+        if quality in {DownloadQuality.MP3, DownloadQuality.ORIGINAL_AUDIO}:
             uploader = info.get("uploader") or info.get("creator")
             title = info.get("title")
             download_title = " - ".join(part.strip() for part in (uploader, title) if isinstance(part, str) and part.strip())

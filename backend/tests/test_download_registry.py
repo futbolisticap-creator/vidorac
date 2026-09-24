@@ -188,7 +188,7 @@ class DownloadEndpointTests(unittest.TestCase):
     def test_mp3_prepare_passes_each_validated_bitrate_to_downloader(self) -> None:
         from app.downloader import DownloadQuality, Mp3Bitrate
 
-        for bitrate in (128, 192, 320):
+        for bitrate in (128, 192, 256, 320):
             with self.subTest(bitrate=bitrate), patch(
                 "app.main.download_media",
                 return_value=make_artifact(f"audio-{bitrate}.mp3"),

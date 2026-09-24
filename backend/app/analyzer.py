@@ -412,12 +412,68 @@ def _pick_format(
         candidates,
         key=lambda item: (
             get_effective_resolution(item) or 0,
+            _positive_number(item.get("abr")) or 0,
             _positive_number(item.get("tbr")) or 0,
             _positive_number(item.get("filesize"))
             or _positive_number(item.get("filesize_approx"))
             or 0,
         ),
     )
+
+
+def _display_audio_codec(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip() or value.lower() == "none":
+        return None
+    codec = value.strip().lower()
+    if codec.startswith(("mp3", "mp4a.69", "mp4a.6b")):
+        return "MP3"
+    if codec.startswith(("mp4a", "aac")):
+        return "AAC"
+    if codec.startswith("opus"):
+        return "Opus"
+    if codec.startswith("vorbis"):
+        return "Vorbis"
+    return value.strip().upper()[:16]
+
+
+def extract_source_audio_metadata(info: Mapping[str, Any]) -> dict[str, Any]:
+    """Return extractor-reported source audio properties without inventing precision."""
+    formats = [item for item in info.get("formats") or [] if isinstance(item, Mapping)]
+    selected = _pick_format(formats, audio_only=True)
+    if selected is None:
+        combined = [
+            item for item in formats
+            if _has_stream(item, "acodec") and _has_stream(item, "vcodec")
+        ]
+        selected = max(
+            combined,
+            key=lambda item: (
+                _positive_number(item.get("abr")) or 0,
+                _positive_number(item.get("tbr")) or 0,
+            ),
+            default=None,
+        )
+
+    audio = selected or info
+    codec = _display_audio_codec(audio.get("acodec") or info.get("acodec"))
+    bitrate = _positive_number(audio.get("abr")) or _positive_number(info.get("abr"))
+    if bitrate is None and selected is not None and not _has_stream(selected, "vcodec"):
+        # For an audio-only representation, tbr is a reasonable container-level
+        # approximation. Never use combined A/V tbr as an audio bitrate.
+        bitrate = _positive_number(selected.get("tbr"))
+    sample_rate = _positive_number(audio.get("asr")) or _positive_number(info.get("asr"))
+    channels = (
+        _positive_number(audio.get("audio_channels"))
+        or _positive_number(audio.get("channels"))
+        or _positive_number(info.get("audio_channels"))
+        or _positive_number(info.get("channels"))
+    )
+    return {
+        "source_audio_codec": codec,
+        "source_audio_bitrate_kbps": round(bitrate) if bitrate is not None else None,
+        "source_audio_sample_rate_hz": round(sample_rate) if sample_rate is not None else None,
+        "source_audio_channels": round(channels) if channels is not None else None,
+    }
 
 
 def build_quality_options(info: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -460,11 +516,36 @@ def build_quality_options(info: Mapping[str, Any]) -> list[dict[str, Any]]:
     options = [
         video_option("best", "Best Quality", None),
         video_option("compatible", "Best MP4", None),
-        video_option("1080", "1080p", 1080),
-        video_option("720", "720p", 720),
-        video_option("480", "480p", 480),
     ]
+
+    # A resolution button must describe the selected source stream, not the
+    # preset ceiling. Build from the smallest ceiling upward to remove duplicate
+    # selections, then display the real resolutions in descending order.
+    resolution_options: list[dict[str, Any]] = []
+    seen_resolutions: set[str] = set()
+    for option_id, height_limit in (("480", 480), ("720", 720), ("1080", 1080)):
+        option = video_option(option_id, f"Up to {height_limit}p", height_limit)
+        resolution = option["resolution"]
+        if option["available"] and isinstance(resolution, str) and resolution not in seen_resolutions:
+            option["label"] = resolution
+            resolution_options.append(option)
+            seen_resolutions.add(resolution)
+    options.extend(reversed(resolution_options))
+
     has_audio = best_audio is not None or any(_has_stream(item, "acodec") for item in formats)
+    original_audio_size = _estimated_format_size(best_audio, duration) if best_audio is not None else None
+    original_audio_ext = best_audio.get("ext") if best_audio is not None else None
+    options.append(
+        {
+            "id": "audio",
+            "label": "Original / Best Audio",
+            "available": best_audio is not None and (original_audio_size is None or original_audio_size <= MAX_ANALYZED_DOWNLOAD_SIZE),
+            "resolution": None,
+            "container": original_audio_ext.upper() if isinstance(original_audio_ext, str) else None,
+            "video_codec": None,
+            "estimated_size_bytes": original_audio_size,
+        }
+    )
     mp3_size = round(duration * 192_000 / 8) if duration is not None and has_audio else None
     options.append(
         {
@@ -551,6 +632,7 @@ def analyze_media(raw_url: str) -> dict[str, Any]:
         "platform": platform,
         "webpage_url": _optional_string(info.get("webpage_url")) or url,
         "max_height": extract_max_height(info),
+        **extract_source_audio_metadata(info),
         "quality_options": build_quality_options(info),
     }
 

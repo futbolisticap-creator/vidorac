@@ -1,7 +1,7 @@
 export const CLIPBOARD_UNAVAILABLE_MESSAGE = "Unable to access the clipboard. Paste the link manually.";
 
 export type QualityOption = {
-  id: "best" | "compatible" | "1080" | "720" | "480" | "mp3";
+  id: "best" | "compatible" | "1080" | "720" | "480" | "audio" | "mp3";
   label: string;
   available: boolean;
   resolution: string | null;
@@ -19,6 +19,10 @@ export type VideoMetadata = {
   platform: "tiktok" | "instagram" | "x" | "reddit" | "facebook";
   webpage_url: string | null;
   max_height: number | null;
+  source_audio_codec: string | null;
+  source_audio_bitrate_kbps: number | null;
+  source_audio_sample_rate_hz: number | null;
+  source_audio_channels: number | null;
   quality_options: QualityOption[];
 };
 
@@ -70,7 +74,7 @@ export async function readClipboardTextSafely(
 type UnknownRecord = Record<string, unknown>;
 const VIDEO_PLATFORMS = ["tiktok", "instagram", "x", "reddit", "facebook"] as const;
 const GALLERY_PLATFORMS = ["tiktok", "instagram", "x", "reddit", "facebook"] as const;
-const QUALITY_IDS = ["best", "compatible", "1080", "720", "480", "mp3"] as const;
+const QUALITY_IDS = ["best", "compatible", "1080", "720", "480", "audio", "mp3"] as const;
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -118,6 +122,10 @@ function normalizeVideo(value: unknown): VideoMetadata | null {
     platform,
     webpage_url: nullableString(value.webpage_url),
     max_height: nullableNumber(value.max_height),
+    source_audio_codec: nullableString(value.source_audio_codec),
+    source_audio_bitrate_kbps: nullableNumber(value.source_audio_bitrate_kbps),
+    source_audio_sample_rate_hz: nullableNumber(value.source_audio_sample_rate_hz),
+    source_audio_channels: nullableNumber(value.source_audio_channels),
     quality_options: qualityOptions,
   };
 }

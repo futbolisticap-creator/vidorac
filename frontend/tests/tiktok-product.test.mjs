@@ -10,7 +10,8 @@ test("homepage is a five-platform Vidorac hub without unfinished product promoti
   const source = await read("src/app/page.tsx");
   const icons = await read("src/app/platform-brand-icon.tsx");
   const config = await read("src/app/platform-config.ts");
-  assert.match(source, /Download public media/);
+  assert.match(source, /Download videos/);
+  assert.match(source, /from your favorite platforms/);
   for (const platform of ["TikTok", "Instagram", "Facebook", "Reddit", "X \/ Twitter"]) assert.match(config, new RegExp(platform.replace("/", "\\/")));
   for (const forbidden of ["Vidorac Desktop", "Vidorac Mobile", "Chrome extension", "Pro subscription"]) assert.doesNotMatch(source, new RegExp(forbidden));
   assert.doesNotMatch(source, /YouTube/);
@@ -24,13 +25,29 @@ test("refined layout is compact, ad-ready and removes the header Beta badge", as
   const platformPage = await read("src/app/platform-downloader-page.tsx");
   const header = await read("src/app/site-header.tsx");
   const ad = await read("src/app/ad-placeholder.tsx");
-  assert.match(home, /<AdPlaceholder/);
+  for (const placement of ["left-rail", "right-rail", "home-inline-1", "home-inline-2"]) assert.match(home, new RegExp(`placement="${placement}"`));
   assert.match(platformPage, /ad-slot-after-tool/);
   assert.match(platformPage, /compact-steps/);
   assert.doesNotMatch(platformPage, /related-platforms/);
   assert.doesNotMatch(header, /beta-badge|>Beta</);
-  assert.match(ad, /Reserved for future advertising/);
+  assert.match(ad, /process\.env\.NODE_ENV !== "production"/);
+  assert.match(ad, /Reserved ad space/);
   assert.doesNotMatch(ad, /googlesyndication|ca-pub-/);
+});
+
+test("homepage redesign keeps premium CTAs and accessible FAQ controls", async () => {
+  const home = await read("src/app/page.tsx");
+  const faq = await read("src/app/home-faq.tsx");
+  const layout = await read("src/app/layout.tsx");
+  const styles = await read("src/app/globals.css");
+  for (const [id, label] of [["tiktok", "TikTok"], ["instagram", "Instagram"], ["facebook", "Facebook"], ["reddit", "Reddit"], ["x", "X"]]) assert.match(home, new RegExp(`${id}: "${label}"`));
+  assert.match(home, /Open \{ctaNames\[id\]\} Downloader/);
+  assert.match(home, /How Vidorac works|How it works/);
+  assert.match(home, /Built for simple media downloads/);
+  assert.match(faq, /aria-expanded=\{isOpen\}/);
+  assert.match(faq, /aria-controls=\{panelId\}/);
+  assert.match(layout, /Instrument_Serif/);
+  assert.match(styles, /@media \(min-width: 1680px\)/);
 });
 
 test("all public downloader routes reuse the shared platform page", async () => {
@@ -50,13 +67,26 @@ test("analyzer sends expected platform for analysis and download preparation", a
   assert.match(source, /Download MP3/);
 });
 
-test("MP3 bitrate choices remain centralized and default to 192 kbps", () => {
+test("MP3 output bitrate choices remain centralized and default to 192 kbps", () => {
   assert.equal(DEFAULT_MP3_BITRATE, 192);
   assert.deepEqual(MP3_BITRATE_OPTIONS.map(({ value, label, description }) => ({ value, label, description })), [
     { value: 128, label: "128 kbps", description: "Small" },
-    { value: 192, label: "192 kbps", description: "Recommended" },
+    { value: 192, label: "192 kbps", description: "Balanced" },
+    { value: 256, label: "256 kbps", description: "Larger" },
     { value: 320, label: "320 kbps", description: "High" },
   ]);
+});
+
+test("audio source quality and MP3 output bitrate stay visibly separate", async () => {
+  const analyzer = await read("src/app/analyzer.tsx");
+  const client = await read("src/app/analyzer-client.ts");
+  assert.match(analyzer, /Source audio:/);
+  assert.match(analyzer, /Unknown source bitrate/);
+  assert.match(analyzer, /MP3 output bitrate/);
+  assert.match(analyzer, /cannot restore quality/);
+  assert.match(analyzer, /Original \/ Best Audio/);
+  assert.match(client, /source_audio_bitrate_kbps/);
+  assert.doesNotMatch(analyzer, /Audio quality<\/legend>/);
 });
 
 test("global navigation stays compact while the sitemap keeps all five routes", async () => {

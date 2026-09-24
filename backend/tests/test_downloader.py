@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import yt_dlp
 from pydantic import ValidationError
 
-from app.analyzer import InvalidUrlError, UnsupportedUrlError
+from app.analyzer import InvalidUrlError, UnsupportedUrlError, extract_source_audio_metadata
 from app.downloader import (
     MAX_FILESIZE_BYTES,
     MAX_DURATION_SECONDS,
@@ -31,7 +31,7 @@ from app.main import DownloadRequest
 
 class QualityValidationTests(unittest.TestCase):
     def test_accepts_every_supported_quality(self) -> None:
-        for quality in ("best", "compatible", "1080", "720", "480", "mp3"):
+        for quality in ("best", "compatible", "1080", "720", "480", "audio", "mp3"):
             with self.subTest(quality=quality):
                 request = DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality=quality)
                 self.assertEqual(request.quality.value, quality)
@@ -41,7 +41,7 @@ class QualityValidationTests(unittest.TestCase):
             DownloadRequest(url="https://www.tiktok.com/@creator/video/123", platform="tiktok", quality="4k")
 
     def test_accepts_only_supported_mp3_bitrates(self) -> None:
-        for bitrate in (128, 192, 320):
+        for bitrate in (128, 192, 256, 320):
             with self.subTest(bitrate=bitrate):
                 request = DownloadRequest(
                     url="https://www.tiktok.com/@creator/video/123",
@@ -169,6 +169,35 @@ class DownloadValidationTests(unittest.TestCase):
             self.assertEqual(artifact.download_name, "Creator - A caption.mp3")
             self.assertEqual(artifact.media_type, "audio/mpeg")
             self.assertGreater(artifact.path.stat().st_size, 0)
+        finally:
+            artifact.path.unlink(missing_ok=True)
+            artifact.temp_directory.rmdir()
+
+    def test_original_audio_avoids_mp3_transcoding(self) -> None:
+        temp_path = Path(tempfile.mkdtemp(prefix="clipora-test-"))
+        downloader = MagicMock()
+
+        def write_download(_url: str, *, download: bool) -> dict[str, object]:
+            self.assertTrue(download)
+            (temp_path / "123.m4a").write_bytes(b"original AAC audio")
+            return {"id": "123", "title": "Original", "uploader": "Creator"}
+
+        downloader.__enter__.return_value.extract_info.side_effect = write_download
+        with (
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
+            patch("app.downloader.is_ffmpeg_available", return_value=False),
+            patch("app.downloader.run_ffmpeg") as runner,
+        ):
+            artifact = download_media(
+                "https://www.tiktok.com/@creator/video/123",
+                DownloadQuality.ORIGINAL_AUDIO,
+            )
+
+        try:
+            self.assertEqual(artifact.path, temp_path / "123.m4a")
+            self.assertEqual(artifact.download_name, "Creator - Original.m4a")
+            runner.assert_not_called()
         finally:
             artifact.path.unlink(missing_ok=True)
             artifact.temp_directory.rmdir()
@@ -352,6 +381,16 @@ class PresetTests(unittest.TestCase):
             self.assertEqual(options["format"], "bestaudio/best")
             self.assertNotIn("postprocessors", options)
 
+    def test_original_audio_selects_best_source_without_requiring_ffmpeg(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            options, _state = build_ydl_options(
+                DownloadQuality.ORIGINAL_AUDIO,
+                Path(directory),
+                ffmpeg_available=False,
+            )
+        self.assertEqual(options["format"], "bestaudio/best")
+        self.assertNotIn("postprocessors", options)
+
     def test_mp3_encoder_uses_safe_arguments_for_each_validated_bitrate(self) -> None:
         for bitrate in Mp3Bitrate:
             with self.subTest(bitrate=bitrate.value), tempfile.TemporaryDirectory() as directory:
@@ -373,6 +412,24 @@ class PresetTests(unittest.TestCase):
                     str(output_path),
                 ]
             )
+
+    def test_320_kbps_output_does_not_relabel_128_kbps_source(self) -> None:
+        source_metadata = extract_source_audio_metadata(
+            {"formats": [{"vcodec": "none", "acodec": "mp4a.40.2", "ext": "m4a", "abr": 128}]}
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            temp_path = Path(directory)
+            source_path = temp_path / "source.m4a"
+            source_path.write_bytes(b"source audio")
+            with (
+                patch("app.downloader.require_encoders"),
+                patch("app.downloader.run_ffmpeg") as runner,
+            ):
+                _encode_mp3(source_path, temp_path, Mp3Bitrate.KBPS_320)
+
+        self.assertEqual(source_metadata["source_audio_bitrate_kbps"], 128)
+        arguments = runner.call_args.args[0]
+        self.assertEqual(arguments[arguments.index("-b:a") + 1], "320k")
 
     def test_mp3_preset_defaults_to_192_kbps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

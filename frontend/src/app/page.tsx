@@ -1,25 +1,44 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import AdPlaceholder from "./ad-placeholder";
+import HomeFaq from "./home-faq";
 import PlatformBrandIcon from "./platform-brand-icon";
 import { platformConfigs, platformOrder } from "./platform-config";
 import SiteFooter from "./site-footer";
 import { SITE_URL } from "./seo";
 import { TelegramHomepageCard } from "./telegram-promotion";
 
-const reasons = [
-  ["Focused by platform", "Every downloader accepts only its matching links, keeping the experience clear."],
-  ["Real available formats", "Vidorac shows media and quality choices exposed by the public post."],
-  ["No account required", "Analyze compatible public links without sharing platform credentials or cookies."],
+export const metadata: Metadata = {
+  title: { absolute: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X" },
+  description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
+  alternates: { canonical: `${SITE_URL}/` },
+};
+
+const steps = [
+  ["01", "Paste a link", "Copy a public media URL from a supported platform."],
+  ["02", "Choose your format", "Select from the video, audio or media options available for that post."],
+  ["03", "Download", "Prepare and download the file you selected."],
 ];
 
-const faqs = [
-  ["Which platforms does Vidorac support?", "TikTok, Instagram, Facebook, Reddit and X / Twitter through five focused downloader pages."],
-  ["Can Vidorac download private content?", "No. Private, deleted, restricted and login-only posts are not supported."],
-  ["Does Vidorac store downloads permanently?", "No. Prepared media uses temporary storage and the existing automatic cleanup lifecycle."],
+const features = [
+  ["Multiple platforms", "Choose from five focused social-platform downloaders."],
+  ["Quality options", "Select from the formats and qualities genuinely available."],
+  ["Mobile friendly", "Use a clear, responsive interface across screen sizes."],
+  ["No installation", "Open Vidorac directly in a modern browser."],
+  ["Audio options", "Use audio-only choices when the source supports them."],
+  ["Platform isolation", "Each downloader accepts links from its matching platform only."],
 ];
+
+const ctaNames = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  reddit: "Reddit",
+  x: "X",
+} as const;
 
 export default function Home() {
-  const description = "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.";
+  const description = "Choose a supported platform and download compatible public videos, audio and media with Vidorac.";
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
@@ -29,48 +48,86 @@ export default function Home() {
   };
 
   return (
-    <main className="page-shell min-h-screen text-white">
+    <main className="page-shell home-page min-h-screen text-white">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }} />
 
-      <section className="hub-hero mx-auto flex w-full max-w-[73.75rem] flex-col items-center px-4 text-center sm:px-6 lg:px-8">
-        <p className="section-label">Five platforms. One clean experience.</p>
-        <h1>Download public media, <span className="hero-accent">simply.</span></h1>
-        <p className="hub-hero-copy">Choose a platform, paste a compatible public link and download the formats that are genuinely available.</p>
-      </section>
-
-      <section className="hub-platform-section mx-auto w-full max-w-[73.75rem] px-4 sm:px-6 lg:px-8" aria-labelledby="platforms-title">
-        <div className="compact-section-heading">
-          <div><p className="section-label">Downloaders</p><h2 id="platforms-title">Choose your platform</h2></div>
-          <p>Each page is limited to its own platform.</p>
+      <div className="home-desktop-layout">
+        <div className="home-ad-rail home-ad-rail-left">
+          <AdPlaceholder placement="left-rail" format="sidebar" />
         </div>
-        <div className="hub-platform-grid">
-          {platformOrder.map((id) => {
-            const platform = platformConfigs[id];
-            return (
-              <article key={id} className={`hub-platform-card hub-platform-${id}`}>
-                <PlatformBrandIcon platform={id} />
-                <div><p className="section-label">{platform.name}</p><h3>{platform.title}</h3><p>{platform.cardDescription}</p></div>
-                <Link href={platform.path} aria-label={`Open ${platform.name} Downloader`}><span>Open downloader</span><span aria-hidden="true">↗</span></Link>
-              </article>
-            );
-          })}
+
+        <div className="home-main-content">
+          <section className="hub-hero" aria-labelledby="home-title">
+            <p className="home-eyebrow">Fast <span>•</span> Simple <span>•</span> Multi-platform</p>
+            <h1 id="home-title">
+              <span>Download videos</span>
+              <em>from your favorite platforms</em>
+            </h1>
+            <p className="hub-hero-copy">Download public videos and media from supported platforms. Choose a platform below to get started.</p>
+          </section>
+
+          <section id="tools" className="hub-platform-section home-section" aria-labelledby="platforms-title">
+            <div className="home-section-heading">
+              <div><p className="section-label">Supported platforms</p><h2 id="platforms-title">Choose where your link comes from</h2></div>
+              <p>Every downloader is kept focused on its own platform.</p>
+            </div>
+            <div className="hub-platform-grid">
+              {platformOrder.map((id) => {
+                const platform = platformConfigs[id];
+                return (
+                  <article key={id} className={`hub-platform-card hub-platform-${id}`}>
+                    <div className="platform-card-header">
+                      <PlatformBrandIcon platform={id} />
+                      <p className="section-label">{platform.name}</p>
+                    </div>
+                    <div className="platform-card-copy"><h3>{platform.title}</h3><p>{platform.cardDescription}</p></div>
+                    <Link className="platform-card-cta" href={platform.path} aria-label={`Open ${ctaNames[id]} Downloader`}>
+                      <span>Open {ctaNames[id]} Downloader</span><span className="platform-card-arrow" aria-hidden="true">→</span>
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <div className="home-inline-ad"><AdPlaceholder placement="home-inline-1" /></div>
+
+          <section id="how-it-works" className="home-section home-how-section" aria-labelledby="how-title">
+            <div className="home-section-heading"><div><p className="section-label">How it works</p><h2 id="how-title">From public link to download in three steps</h2></div></div>
+            <div className="home-steps-grid">
+              {steps.map(([number, title, text]) => <article key={number}><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}
+            </div>
+          </section>
+
+          <section id="about" className="home-section" aria-labelledby="why-title">
+            <div className="home-section-heading"><div><p className="section-label">Why Vidorac</p><h2 id="why-title">Built for simple media downloads</h2></div><p>A focused interface that shows what is actually available.</p></div>
+            <div className="home-feature-grid">
+              {features.map(([title, text], index) => <article key={title}><span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}
+            </div>
+          </section>
+
+          <section className="home-section home-editorial" aria-labelledby="editorial-title">
+            <div><p className="section-label">Made to stay clear</p><h2 id="editorial-title">A simpler way to handle public media links</h2></div>
+            <div className="home-editorial-copy">
+              <p>Vidorac brings supported public-media tools into one straightforward hub. Start by choosing the platform that matches your link, then paste the direct URL on that platform&apos;s dedicated downloader page. Keeping each tool separate makes it easier to understand which links belong where and helps prevent a request from being sent to the wrong service.</p>
+              <p>The formats you see depend on the original post. One source may offer several video qualities, while another may expose only a single file, a gallery, or an audio option. Vidorac presents the compatible choices it can verify instead of promising formats that are not available. No desktop software or browser extension is required; the experience runs in a modern browser and is designed to remain comfortable on phones, tablets and larger screens.</p>
+              <p>Public access does not automatically grant permission to reuse media. Only download content you own, have permission to use, or are otherwise legally entitled to access. Private, deleted, restricted and login-only posts may not be available.</p>
+            </div>
+          </section>
+
+          <div className="home-inline-ad"><AdPlaceholder placement="home-inline-2" /></div>
+
+          <section id="faq" className="home-section home-faq-section" aria-labelledby="home-faq-title">
+            <div className="home-section-heading"><div><p className="section-label">FAQ</p><h2 id="home-faq-title">Good to know before you start</h2></div></div>
+            <HomeFaq />
+          </section>
+
+          <div className="telegram-home-section"><TelegramHomepageCard /></div>
         </div>
-      </section>
 
-      <div className="ad-slot-section"><AdPlaceholder /></div>
-
-      <section className="compact-content-section" aria-labelledby="why-title">
-        <div className="compact-section-heading"><div><p className="section-label">Why Vidorac</p><h2 id="why-title">Useful, focused and transparent.</h2></div><p>Built for public media without unnecessary steps.</p></div>
-        <div className="benefit-grid">{reasons.map(([title, text]) => <article key={title}><span aria-hidden="true">✓</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div>
-      </section>
-
-      <section className="compact-content-section compact-faq-section" aria-labelledby="home-faq-title">
-        <div className="compact-section-heading"><div><p className="section-label">FAQ</p><h2 id="home-faq-title">Good to know</h2></div></div>
-        <div className="faq-list compact-faq-list">{faqs.map(([question, answer]) => <details key={question}><summary>{question}</summary><p>{answer}</p></details>)}</div>
-      </section>
-
-      <div className="telegram-home-section">
-        <TelegramHomepageCard />
+        <div className="home-ad-rail home-ad-rail-right">
+          <AdPlaceholder placement="right-rail" format="sidebar" />
+        </div>
       </div>
 
       <SiteFooter />
