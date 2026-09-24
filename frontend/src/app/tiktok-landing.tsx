@@ -3,6 +3,7 @@ import Analyzer from "./analyzer";
 import AnalyzerBoundary from "./analyzer-boundary";
 import { AnalyzerDiagnosticsProvider } from "./analyzer-diagnostics";
 import { DownloaderHeroHeading, EditorialSectionHeading } from "./editorial-heading";
+import OtherDownloaders from "./other-downloaders";
 import SiteFooter from "./site-footer";
 import SupportButton from "./support-button";
 
@@ -48,6 +49,7 @@ export default function TikTokLanding({ content }: { content: TikTokLandingConte
       </section>
 
       <section className="seo-section seo-section-bordered" aria-labelledby="faq-title"><EditorialSectionHeading eyebrow="Frequently asked questions" title="Common questions" accent="answered clearly" id="faq-title" layout="seo" /><div className="faq-list">{content.faqs.map((faq) => <details key={faq.question}><summary>{faq.question}</summary><p>{faq.answer}</p></details>)}</div></section>
+      <OtherDownloaders currentPlatform="tiktok" />
       <section className="seo-section seo-donate-section seo-section-bordered"><div><p className="section-label">Keep the beta online</p><h2>Vidorac is free to use.</h2><p>If it helped you, an optional donation can help keep the project online.</p></div><SupportButton label="Donate to Vidorac" variant="card" /></section>
       <SiteFooter />
     </main>

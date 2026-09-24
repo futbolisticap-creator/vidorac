@@ -4,6 +4,7 @@ import Analyzer from "./analyzer";
 import AnalyzerBoundary from "./analyzer-boundary";
 import { AnalyzerDiagnosticsProvider } from "./analyzer-diagnostics";
 import { DownloaderHeroHeading, EditorialSectionHeading } from "./editorial-heading";
+import OtherDownloaders from "./other-downloaders";
 import type { PlatformPageConfig } from "./platform-config";
 import SiteFooter from "./site-footer";
 
@@ -42,6 +43,8 @@ export default function PlatformDownloaderPage({ config }: { config: PlatformPag
         <EditorialSectionHeading eyebrow="FAQ" title="Common questions" accent="answered clearly" id={`${config.id}-faq-title`} />
         <div className="faq-list compact-faq-list">{config.faqs.map((faq) => <details key={faq.question}><summary>{faq.question}</summary><p>{faq.answer}</p></details>)}</div>
       </section>
+
+      <OtherDownloaders currentPlatform={config.id} />
 
       <SiteFooter />
     </main>
