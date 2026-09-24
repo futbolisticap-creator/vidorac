@@ -213,7 +213,7 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     page.get_by_test_id("donation-modal-backdrop").click(position={"x": 3, "y": 3})
     assert result_dialog.count() == 0, f"{name}: backdrop click did not close donation modal"
     assert result_support_button.evaluate("element => document.activeElement === element"), f"{name}: result CTA focus was not restored"
-    page.get_by_role("button", name=re.compile(r"^Download MP3")).wait_for()
+    page.get_by_test_id("mp3-bitrate-128").wait_for()
     page.get_by_role("button", name=re.compile(r"^Original \/ Best Audio")).wait_for()
     page.get_by_text("Source audio: AAC · ~128 kbps · 44.1 kHz · 2 ch", exact=True).wait_for()
     page.get_by_role("heading", name="Download video").wait_for()
@@ -221,22 +221,16 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     assert analyze_requests[0]["url"] == TIKTOK_URL
     assert analyze_requests[0]["diagnostic_request_id"].startswith("mobile-debug-")
 
-    bitrate_128 = page.get_by_role("button", name="128 kbps Small")
-    bitrate_192 = page.get_by_role("button", name="192 kbps Recommended")
-    bitrate_256 = page.get_by_role("button", name="256 kbps Larger")
-    bitrate_320 = page.get_by_role("button", name="320 kbps High")
-    assert bitrate_192.get_attribute("aria-pressed") == "true", f"{name}: 192 kbps is not selected by default"
-    bitrate_128.click()
-    assert bitrate_128.get_attribute("aria-pressed") == "true", f"{name}: 128 kbps selection failed"
+    bitrate_128 = page.get_by_test_id("mp3-bitrate-128")
+    bitrate_192 = page.get_by_test_id("mp3-bitrate-192")
+    bitrate_256 = page.get_by_test_id("mp3-bitrate-256")
+    bitrate_320 = page.get_by_test_id("mp3-bitrate-320")
     bitrate_320.click()
-    assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: 320 kbps selection failed"
-    assert len(analyze_requests) == 1, f"{name}: changing MP3 bitrate repeated analysis"
-
-    page.get_by_role("button", name=re.compile(r"^Download MP3")).click()
     page.wait_for_timeout(100)
     assert len(pending_prepare_routes) == 1, f"{name}: MP3 preparation was not requested"
-    assert bitrate_128.is_disabled() and bitrate_192.is_disabled() and bitrate_256.is_disabled() and bitrate_320.is_disabled(), f"{name}: bitrate controls stayed enabled during preparation"
-    assert prepare_requests[0]["audio_bitrate"] == 320, f"{name}: selected MP3 bitrate was not sent"
+    assert bitrate_320.is_disabled(), f"{name}: clicked bitrate stayed enabled during preparation"
+    assert not bitrate_128.is_disabled() and not bitrate_192.is_disabled() and not bitrate_256.is_disabled(), f"{name}: unrelated bitrate actions were disabled"
+    assert prepare_requests[0]["audio_bitrate"] == 320, f"{name}: clicked MP3 bitrate was not sent"
     pending_prepare_routes[0].fulfill(
         status=500,
         content_type="application/json",
@@ -244,7 +238,6 @@ def run_viewport(browser, name: str, width: int, height: int, user_agent: str | 
     )
     page.get_by_text("We couldn't prepare this MP3. Please try again.", exact=True).wait_for()
     assert page.get_by_test_id("analyze-result-support").is_visible(), f"{name}: result support disappeared after a failed download"
-    assert bitrate_320.get_attribute("aria-pressed") == "true", f"{name}: failed preparation lost selected bitrate"
     assert not bitrate_320.is_disabled(), f"{name}: controls did not recover after preparation failure"
     console_errors.clear()  # The intentional HTTP 500 above is expected to reach the browser console.
 
@@ -614,12 +607,11 @@ def run_mp3_download_transition_matrix(browser) -> None:
           window.__stableMp3Nodes = {
             card: document.querySelector('[data-testid="audio-card"]'),
             selector: document.querySelector('[data-testid="mp3-bitrate-selector"]'),
-            button: document.querySelector('[data-testid="mp3-download-button"]'),
-            iconSlot: document.querySelector('[data-testid="mp3-action-icon-slot"]'),
-            spinner: document.querySelector('[data-testid="mp3-action-spinner"]'),
-            copy: document.querySelector('[data-testid="mp3-action-copy"]'),
-            label: document.querySelector('[data-testid="mp3-action-label"]'),
-            status: document.querySelector('[data-testid="mp3-status"]'),
+            button: document.querySelector('[data-testid="mp3-bitrate-192"]'),
+            iconSlot: document.querySelector('[data-testid="mp3-192-icon-slot"]'),
+            spinner: document.querySelector('[data-testid="mp3-192-spinner"]'),
+            copy: document.querySelector('[data-testid="mp3-192-copy"]'),
+            label: document.querySelector('[data-testid="mp3-192-label"]'),
           };
         }
         """
@@ -632,18 +624,17 @@ def run_mp3_download_transition_matrix(browser) -> None:
               const nodes = window.__stableMp3Nodes;
               return nodes.card === document.querySelector('[data-testid="audio-card"]')
                 && nodes.selector === document.querySelector('[data-testid="mp3-bitrate-selector"]')
-                && nodes.button === document.querySelector('[data-testid="mp3-download-button"]')
-                && nodes.iconSlot === document.querySelector('[data-testid="mp3-action-icon-slot"]')
-                && nodes.spinner === document.querySelector('[data-testid="mp3-action-spinner"]')
-                && nodes.copy === document.querySelector('[data-testid="mp3-action-copy"]')
-                && nodes.label === document.querySelector('[data-testid="mp3-action-label"]')
-                && nodes.status === document.querySelector('[data-testid="mp3-status"]');
+                && nodes.button === document.querySelector('[data-testid="mp3-bitrate-192"]')
+                && nodes.iconSlot === document.querySelector('[data-testid="mp3-192-icon-slot"]')
+                && nodes.spinner === document.querySelector('[data-testid="mp3-192-spinner"]')
+                && nodes.copy === document.querySelector('[data-testid="mp3-192-copy"]')
+                && nodes.label === document.querySelector('[data-testid="mp3-192-label"]');
             }
             """
         )
 
-    button = page.get_by_test_id("mp3-download-button")
-    label = page.get_by_test_id("mp3-action-label")
+    button = page.get_by_test_id("mp3-bitrate-192")
+    label = page.get_by_test_id("mp3-192-label")
     page.evaluate("() => { window.__nativeAnchorClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() {}; }")
     button.click()
     label.get_by_text("MP3 ready", exact=True).wait_for()
@@ -657,22 +648,24 @@ def run_mp3_download_transition_matrix(browser) -> None:
     assert_mp3_nodes_stable()
     assert not native_download_requests
     page.clock.fast_forward(2_400)
-    label.get_by_text(re.compile(r"^Download MP3")).wait_for()
+    label.get_by_text("192 kbps", exact=True).wait_for()
     page.evaluate("() => { HTMLAnchorElement.prototype.click = window.__nativeAnchorClick; }")
 
-    descriptions = {128: "Small", 192: "Recommended", 256: "Larger", 320: "High"}
     for bitrate in (128, 192, 256, 320):
-        page.get_by_role("button", name=f"{bitrate} kbps {descriptions[bitrate]}").click()
+        button = page.get_by_test_id(f"mp3-bitrate-{bitrate}")
+        label = page.get_by_test_id(f"mp3-{bitrate}-label")
+        button.evaluate("element => { window.__stableCurrentBitrateButton = element; }")
         button.click()
         label.get_by_text("MP3 ready", exact=True).wait_for()
         assert_mp3_nodes_stable()
+        assert button.evaluate("element => element === window.__stableCurrentBitrateButton")
         page.clock.fast_forward(350)
         label.get_by_text("Download started", exact=True).wait_for()
         assert_mp3_nodes_stable()
         page.get_by_text("Vidorac Diagnostics", exact=True).locator("..").evaluate("element => { element.open = true; }")
         page.get_by_text("Download stage: mp3-download-triggered", exact=False).wait_for()
         page.clock.fast_forward(2_400)
-        label.get_by_text(re.compile(r"^Download MP3")).wait_for()
+        label.get_by_text(f"{bitrate} kbps", exact=True).wait_for()
         assert_mp3_nodes_stable()
 
     assert [body["audio_bitrate"] for body in prepare_bodies[-4:]] == [128, 192, 256, 320]

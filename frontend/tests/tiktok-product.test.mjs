@@ -103,6 +103,10 @@ test("audio source quality and MP3 output bitrate stay visibly separate", async 
   assert.match(analyzer, /MP3 output bitrate/);
   assert.match(analyzer, /cannot restore quality/);
   assert.match(analyzer, /Original \/ Best Audio/);
+  assert.match(analyzer, /onClick=\{\(\) => handleQuality\("mp3", option\.value\)\}/);
+  assert.match(analyzer, /aria-label=\{`Download MP3 at \$\{option\.value\} kbps`\}/);
+  assert.match(analyzer, /quality:mp3:\$\{option\.value\}/);
+  assert.doesNotMatch(analyzer, /mp3-download-button|setMp3Bitrate|Download MP3 ·/);
   assert.match(client, /source_audio_bitrate_kbps/);
   assert.doesNotMatch(analyzer, /Audio quality<\/legend>/);
 });
