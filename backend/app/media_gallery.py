@@ -8,7 +8,6 @@ import socket
 import ssl
 import subprocess
 import sys
-import tempfile
 import threading
 import zipfile
 from dataclasses import dataclass
@@ -24,6 +23,7 @@ from urllib3.util.retry import Retry
 
 from .analyzer import ensure_individual_media_url, normalize_url_for_extraction, validate_and_classify_url
 from .downloader import DownloadArtifact, safe_download_name
+from .temp_files import cleanup_temp_directory, create_temp_directory, handoff_temp_directory
 
 
 logger = logging.getLogger("clipora.gallery")
@@ -583,7 +583,7 @@ def download_gallery_post(
 ) -> DownloadArtifact:
     extraction = extract_gallery_post(raw_url)
     selected = _selected_items(extraction, item_indices)
-    temp_directory = Path(tempfile.mkdtemp(prefix="clipora-gallery-"))
+    temp_directory = create_temp_directory("clipora-gallery-")
     downloaded: list[Path] = []
     total_size = 0
 
@@ -619,7 +619,7 @@ def download_gallery_post(
             source_index = selected[0][0]
             suffix = "" if extraction.media_type == "image" else f" - {item.kind.title()} {source_index + 1}"
             title = (extraction.title or "Vidorac media")[:90].rstrip()
-            return DownloadArtifact(
+            artifact = DownloadArtifact(
                 path=output_path,
                 download_name=safe_download_name(
                     f"{title}{suffix}",
@@ -628,19 +628,23 @@ def download_gallery_post(
                 media_type=mimetypes.guess_type(output_path.name)[0] or "application/octet-stream",
                 temp_directory=temp_directory,
             )
+            handoff_temp_directory(temp_directory)
+            return artifact
 
         zip_path = temp_directory / "vidorac-post.zip"
         _create_safe_zip(downloaded, zip_path)
-        return DownloadArtifact(
+        artifact = DownloadArtifact(
             path=zip_path,
             download_name=safe_download_name(extraction.title or f"{extraction.platform}-post", "zip"),
             media_type="application/zip",
             temp_directory=temp_directory,
         )
+        handoff_temp_directory(temp_directory)
+        return artifact
     except GalleryError:
-        shutil.rmtree(temp_directory, ignore_errors=True)
+        cleanup_temp_directory(temp_directory)
         raise
     except Exception as exc:
         logger.exception("Could not download gallery post %s", raw_url)
-        shutil.rmtree(temp_directory, ignore_errors=True)
+        cleanup_temp_directory(temp_directory)
         raise GalleryDownloadError from exc

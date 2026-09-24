@@ -405,7 +405,7 @@ class DownloadAndZipTests(unittest.TestCase):
         made = Path(tempfile.mkdtemp(prefix="clipora-gallery-failure-test-"))
         with (
             patch("app.media_gallery.extract_gallery_post", return_value=extraction("jpg", "png")),
-            patch("app.media_gallery.tempfile.mkdtemp", return_value=str(made)),
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(made)),
             patch("app.media_gallery._download_item", side_effect=GalleryDownloadError),
             self.assertRaises(GalleryDownloadError),
         ):

@@ -9,6 +9,7 @@ from fastapi import Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.download_registry import (
+    PREPARED_DOWNLOAD_TTL,
     PreparedDownloadExpiredError,
     PreparedDownloadFileMissingError,
     PreparedDownloadNotFoundError,
@@ -46,7 +47,7 @@ def make_http_request() -> Request:
 class PreparedDownloadRegistryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.clock = MutableClock()
-        self.registry = PreparedDownloadRegistry(ttl_seconds=900, clock=self.clock)
+        self.registry = PreparedDownloadRegistry(ttl_seconds=PREPARED_DOWNLOAD_TTL, clock=self.clock)
         self.claimed = []
 
     def tearDown(self) -> None:
@@ -85,9 +86,17 @@ class PreparedDownloadRegistryTests(unittest.TestCase):
         with self.assertRaises(PreparedDownloadNotFoundError):
             self.registry.claim(download_id)
 
+    def test_download_remains_valid_before_ten_minutes(self) -> None:
+        download_id, _prepared = self.registry.register(make_artifact())
+        self.clock.value += PREPARED_DOWNLOAD_TTL - 1
+
+        claimed = self.registry.claim(download_id)
+        self.claimed.append(claimed)
+        self.assertTrue(claimed.path.exists())
+
     def test_expired_download_is_deleted(self) -> None:
         download_id, prepared = self.registry.register(make_artifact())
-        self.clock.value += 901
+        self.clock.value += PREPARED_DOWNLOAD_TTL
 
         with self.assertRaises(PreparedDownloadExpiredError):
             self.registry.claim(download_id)
@@ -97,7 +106,7 @@ class PreparedDownloadRegistryTests(unittest.TestCase):
 
     def test_register_lazily_cleans_expired_downloads(self) -> None:
         _old_id, old = self.registry.register(make_artifact("old.mp4"))
-        self.clock.value += 901
+        self.clock.value += PREPARED_DOWNLOAD_TTL
         _new_id, _new = self.registry.register(make_artifact("new.mp4"))
 
         self.assertFalse(old.temp_directory.exists())
@@ -221,6 +230,27 @@ class DownloadEndpointTests(unittest.TestCase):
         self.assertEqual(second.status_code, 404)
         if response.background is not None:
             asyncio.run(response.background())
+
+    def test_interrupted_file_response_still_cleans_temporary_directory(self) -> None:
+        download_id, prepared = prepared_downloads.register(make_artifact("Interrupted.mp4"))
+        response = asyncio.run(deliver_download(download_id))
+
+        async def receive() -> dict[str, str]:
+            return {"type": "http.disconnect"}
+
+        async def disconnected_send(_message: dict[str, object]) -> None:
+            raise ConnectionError("client disconnected")
+
+        async def stream() -> None:
+            await response(
+                {"type": "http", "method": "GET", "headers": []},
+                receive,
+                disconnected_send,
+            )
+
+        with self.assertRaises(ConnectionError):
+            asyncio.run(stream())
+        self.assertFalse(prepared.temp_directory.exists())
 
     def test_missing_delivery_file_is_controlled(self) -> None:
         download_id, prepared = prepared_downloads.register(make_artifact())

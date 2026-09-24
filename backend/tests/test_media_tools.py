@@ -74,7 +74,7 @@ class UploadTests(unittest.TestCase):
                 asyncio.run(save_upload(upload_file(b"12345")))
 
     def test_disallowed_extension_is_rejected_before_temp_creation(self) -> None:
-        with patch("app.tools.upload_utils.tempfile.mkdtemp") as make_temp:
+        with patch("app.temp_files.tempfile.mkdtemp") as make_temp:
             with self.assertRaises(UnsupportedUploadError):
                 asyncio.run(save_upload(upload_file(b"payload", filename="malware.exe")))
             make_temp.assert_not_called()

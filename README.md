@@ -117,7 +117,7 @@ Invoke-WebRequest `
 
 For MP3, change `quality` to `"mp3"`, optionally add `audio_bitrate = 128`, `192`, or `320`, and use `vidorac-test.mp3` as the output filename. Omitting `audio_bitrate` keeps the backward-compatible 192 kbps default. The selected bitrate controls output encoding and file size; it cannot improve audio detail absent from the TikTok source.
 
-Prepared downloads expire after 15 minutes and are single-use. Expired, delivered, failed, and missing temporary files are removed automatically. The in-memory registry is cleared when the backend shuts down normally.
+Prepared downloads expire after 10 minutes and are single-use. A cleanup pass runs every 5 minutes, removes expired registry entries, and deletes Vidorac-owned orphan directories older than 30 minutes. Expired, delivered, failed, and missing temporary files are removed automatically. The in-memory registry is cleared when the backend shuts down normally.
 
 ### Local safety limits
 
@@ -232,7 +232,7 @@ Because `NEXT_PUBLIC_*` values are embedded at build time, changing the Render U
 
 - Render may put the service to sleep. The first analysis after inactivity can take longer while it wakes; the existing loading state remains visible and the frontend does not impose a short artificial timeout.
 - During that cold start, Analyze changes from its normal loading state to **Starting Vidorac…** after 3 seconds, **Almost ready…** after 15 seconds, and a longer-wait message after 45 seconds. Production requests time out after 120 seconds and can be retried with the same URL without reloading the page. Any real HTTP response cancels these waiting states immediately so platform errors are only classified from an actual backend response.
-- Prepared downloads and uploads use isolated operating-system temporary directories. Files are removed after delivery, on failure, when their 15-minute registry entry expires during registry activity, and on a normal shutdown. Render's ephemeral filesystem is appropriate and no persistent disk, database, or Redis is required.
+- Prepared downloads and uploads use isolated operating-system temporary directories. Files are removed after delivery, on failure, when their 10-minute registry entry expires, by the 5-minute cleanup loop, and on a normal shutdown. A conservative startup and periodic sweep removes only unprotected Vidorac-owned orphan directories older than 30 minutes. Render's ephemeral filesystem is appropriate and no persistent disk, database, or Redis is required.
 - `VIDORAC_MAX_CONCURRENT_JOBS=2` bounds heavy preparation and FFmpeg work without serializing lightweight analysis.
 - `VIDORAC_PREPARATION_RATE_LIMIT=12` allows twelve preparation requests per client in a rolling ten-minute window; it is enforced in the backend rather than relying on the browser.
 - A forced container termination can interrupt cleanup, but Render discards the service's ephemeral filesystem when the instance is replaced. There is no durable storage growth across instances.

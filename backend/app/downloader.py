@@ -2,7 +2,6 @@ import logging
 import mimetypes
 import re
 import shutil
-import tempfile
 import unicodedata
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -18,6 +17,7 @@ import yt_dlp
 
 from .analyzer import ensure_individual_media_url, validate_and_classify_url
 from .format_presets import infer_output_container, select_streams
+from .temp_files import cleanup_temp_directory, create_temp_directory, handoff_temp_directory
 from .tools.ffmpeg_runner import require_encoders, run_ffmpeg
 
 
@@ -360,7 +360,7 @@ def download_media(
 ) -> DownloadArtifact:
     url, platform = validate_and_classify_url(raw_url)
     ensure_individual_media_url(url, platform)
-    temp_directory = Path(tempfile.mkdtemp(prefix="clipora-"))
+    temp_directory = create_temp_directory("clipora-")
     ffmpeg_available = is_ffmpeg_available()
 
     try:
@@ -400,12 +400,14 @@ def download_media(
             download_title = download_title or "vidorac-tiktok-audio"
         else:
             download_title = info.get("title")
-        return DownloadArtifact(
+        artifact = DownloadArtifact(
             path=output_path,
             download_name=safe_download_name(download_title, extension),
             media_type=_media_type_for(output_path),
             temp_directory=temp_directory,
         )
+        handoff_temp_directory(temp_directory)
+        return artifact
     except (yt_dlp.utils.DownloadError, yt_dlp.utils.DownloadCancelled) as exc:
         logger.warning("yt-dlp could not prepare %s: %s", url, exc)
         if "limit_state" in locals():
@@ -417,12 +419,12 @@ def download_media(
                 error = _map_download_error(str(exc), ffmpeg_available=ffmpeg_available)
         else:
             error = _map_download_error(str(exc), ffmpeg_available=ffmpeg_available)
-        shutil.rmtree(temp_directory, ignore_errors=True)
+        cleanup_temp_directory(temp_directory)
         raise error from exc
     except DownloadPreparationError:
-        shutil.rmtree(temp_directory, ignore_errors=True)
+        cleanup_temp_directory(temp_directory)
         raise
     except Exception as exc:
         logger.exception("Unexpected download error for %s", url)
-        shutil.rmtree(temp_directory, ignore_errors=True)
+        cleanup_temp_directory(temp_directory)
         raise DownloadPreparationError from exc

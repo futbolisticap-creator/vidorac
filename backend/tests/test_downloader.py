@@ -86,7 +86,7 @@ class QualityValidationTests(unittest.TestCase):
 
 class DownloadValidationTests(unittest.TestCase):
     def test_rejects_invalid_url_before_creating_a_temp_directory(self) -> None:
-        with patch("app.downloader.tempfile.mkdtemp") as make_temp:
+        with patch("app.temp_files.tempfile.mkdtemp") as make_temp:
             with self.assertRaises(InvalidUrlError):
                 download_media("file:///etc/passwd", DownloadQuality.HD_720)
             make_temp.assert_not_called()
@@ -107,7 +107,7 @@ class DownloadValidationTests(unittest.TestCase):
         downloader = unittest.mock.MagicMock()
         downloader.__enter__.return_value.extract_info.side_effect = yt_dlp.utils.DownloadError("test failure")
         with (
-            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(temp_path)),
             patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
             patch("app.downloader.is_ffmpeg_available", return_value=True),
             self.assertRaises(DownloadPreparationError),
@@ -126,7 +126,7 @@ class DownloadValidationTests(unittest.TestCase):
 
         downloader.__enter__.return_value.extract_info.side_effect = write_download
         with (
-            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(temp_path)),
             patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
             patch("app.downloader.is_ffmpeg_available", return_value=True),
         ):
@@ -154,7 +154,7 @@ class DownloadValidationTests(unittest.TestCase):
 
         downloader.__enter__.return_value.extract_info.side_effect = write_download
         with (
-            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(temp_path)),
             patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
             patch("app.downloader.is_ffmpeg_available", return_value=True),
             patch("app.downloader.require_encoders"),
@@ -183,7 +183,7 @@ class DownloadValidationTests(unittest.TestCase):
 
         downloader.__enter__.return_value.extract_info.side_effect = write_download
         with (
-            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(temp_path)),
             patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
             patch("app.downloader.is_ffmpeg_available", return_value=True),
             patch("app.downloader.require_encoders"),
@@ -209,7 +209,7 @@ class DownloadValidationTests(unittest.TestCase):
 
         downloader.__enter__.return_value.extract_info.side_effect = write_download
         with (
-            patch("app.downloader.tempfile.mkdtemp", return_value=str(temp_path)),
+            patch("app.temp_files.tempfile.mkdtemp", return_value=str(temp_path)),
             patch("app.downloader.yt_dlp.YoutubeDL", return_value=downloader),
             patch("app.downloader.is_ffmpeg_available", return_value=True),
             patch("app.downloader.require_encoders"),

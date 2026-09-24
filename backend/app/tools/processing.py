@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 
-from ..download_registry import cleanup_temp_directory
 from ..downloader import DownloadArtifact, MAX_FILESIZE_BYTES
+from ..temp_files import cleanup_temp_directory, handoff_temp_directory
 from .ffmpeg_runner import validate_output
 from .upload_utils import UploadedMedia, derived_download_name
 
@@ -47,12 +47,11 @@ def finalize_output(
     except OSError:
         logger.warning("Could not remove tool input before registering output")
 
-    return (
-        DownloadArtifact(
-            path=output_path,
-            download_name=derived_download_name(upload, name_suffix, extension),
-            media_type=CONTENT_TYPES[extension],
-            temp_directory=upload.temp_directory,
-        ),
-        output_size,
+    artifact = DownloadArtifact(
+        path=output_path,
+        download_name=derived_download_name(upload, name_suffix, extension),
+        media_type=CONTENT_TYPES[extension],
+        temp_directory=upload.temp_directory,
     )
+    handoff_temp_directory(upload.temp_directory)
+    return artifact, output_size

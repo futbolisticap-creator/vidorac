@@ -3,7 +3,8 @@ import logging
 import os
 import re
 import threading
-from contextlib import asynccontextmanager
+from collections.abc import Callable
+from contextlib import asynccontextmanager, suppress
 from typing import Annotated, AsyncIterator, Literal
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -94,6 +95,10 @@ from .tools.errors import (
 from .tools.processing import ToolResult
 from .tools.trimmer import trim_video
 from .tools.upload_utils import save_upload
+from .temp_files import (
+    TEMP_CLEANUP_INTERVAL,
+    cleanup_orphan_temp_directories,
+)
 
 
 logging.basicConfig(
@@ -119,6 +124,52 @@ def run_heavy_job(function, *args, **kwargs):
         return function(*args, **kwargs)
 
 
+class RunCleanupOnce:
+    def __init__(self, callback: Callable[[], None]) -> None:
+        self._callback = callback
+        self._lock = threading.Lock()
+        self._completed = False
+
+    def __call__(self) -> None:
+        with self._lock:
+            if self._completed:
+                return
+            self._completed = True
+        self._callback()
+
+
+class DisconnectSafeFileResponse(FileResponse):
+    def __init__(self, *args, fallback_cleanup: Callable[[], None], **kwargs) -> None:
+        self._fallback_cleanup = fallback_cleanup
+        super().__init__(*args, **kwargs)
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            await asyncio.to_thread(self._fallback_cleanup)
+
+
+def run_temp_cleanup_pass() -> tuple[int, int]:
+    expired = prepared_downloads.cleanup_expired()
+    orphans = cleanup_orphan_temp_directories(
+        additionally_protected=prepared_downloads.temp_directories()
+    )
+    return expired, orphans
+
+
+async def periodic_temp_cleanup() -> None:
+    while True:
+        await asyncio.sleep(TEMP_CLEANUP_INTERVAL)
+        try:
+            await asyncio.to_thread(run_temp_cleanup_pass)
+        except Exception:
+            logging.getLogger("clipora.temp_files").warning(
+                "Periodic temporary-file cleanup failed; it will retry on the next pass",
+                exc_info=True,
+            )
+
+
 def analysis_error_content(detail: str, error: AnalysisFailedError | None = None) -> dict[str, object]:
     content: dict[str, object] = {"success": False, "detail": detail}
     if DEVELOPMENT_MODE and error is not None and error.technical_error:
@@ -129,8 +180,19 @@ def analysis_error_content(detail: str, error: AnalysisFailedError | None = None
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
+        await asyncio.to_thread(cleanup_orphan_temp_directories)
+    except Exception:
+        logging.getLogger("clipora.temp_files").warning(
+            "Startup temporary-file cleanup failed; periodic cleanup will retry",
+            exc_info=True,
+        )
+    cleanup_task = asyncio.create_task(periodic_temp_cleanup())
+    try:
         yield
     finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
         await asyncio.to_thread(prepared_downloads.clear)
 
 
@@ -724,14 +786,13 @@ async def deliver_download(download_id: str) -> FileResponse | JSONResponse:
             content={"success": False, "detail": "This prepared file is no longer available."},
         )
 
-    cleanup = BackgroundTask(
-        cleanup_prepared_download,
-        prepared,
-    )
-    return FileResponse(
+    cleanup_once = RunCleanupOnce(lambda: cleanup_prepared_download(prepared))
+    cleanup = BackgroundTask(cleanup_once)
+    return DisconnectSafeFileResponse(
         path=prepared.path,
         media_type=prepared.content_type,
         filename=prepared.filename,
         content_disposition_type="attachment",
         background=cleanup,
+        fallback_cleanup=cleanup_once,
     )

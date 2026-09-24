@@ -1,12 +1,11 @@
 import logging
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import UploadFile
 
-from ..download_registry import cleanup_temp_directory
 from ..downloader import MAX_FILESIZE_BYTES, safe_download_name
+from ..temp_files import cleanup_temp_directory, create_temp_directory
 from .errors import MediaIOError, UnsupportedUploadError, UploadTooLargeError
 
 
@@ -57,7 +56,7 @@ def validate_upload_metadata(file: UploadFile) -> tuple[str, str]:
 
 async def save_upload(file: UploadFile) -> UploadedMedia:
     safe_name, extension = validate_upload_metadata(file)
-    temp_directory = Path(tempfile.mkdtemp(prefix="clipora-tool-"))
+    temp_directory = create_temp_directory("clipora-tool-")
     destination = temp_directory / f"input{extension}"
     total_bytes = 0
 

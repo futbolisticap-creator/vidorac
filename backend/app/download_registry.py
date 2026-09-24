@@ -1,6 +1,5 @@
 import re
 import secrets
-import shutil
 import threading
 import time
 from collections.abc import Callable
@@ -8,9 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .downloader import DownloadArtifact
+from .temp_files import cleanup_temp_directory, protect_temp_directory
 
 
-PREPARED_DOWNLOAD_TTL = 15 * 60
+PREPARED_DOWNLOAD_TTL = 10 * 60
 DOWNLOAD_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
@@ -35,10 +35,6 @@ class PreparedDownload:
     created_at: float
 
 
-def cleanup_temp_directory(temp_directory: Path) -> None:
-    shutil.rmtree(temp_directory, ignore_errors=True)
-
-
 def cleanup_prepared_download(download: PreparedDownload) -> None:
     cleanup_temp_directory(download.temp_directory)
 
@@ -61,6 +57,7 @@ class PreparedDownloadRegistry:
 
     def register(self, artifact: DownloadArtifact) -> tuple[str, PreparedDownload]:
         self.cleanup_expired()
+        protect_temp_directory(artifact.temp_directory)
         prepared = PreparedDownload(
             path=artifact.path,
             filename=artifact.download_name,
@@ -125,6 +122,10 @@ class PreparedDownloadRegistry:
         for prepared in prepared_downloads:
             cleanup_prepared_download(prepared)
         return len(prepared_downloads)
+
+    def temp_directories(self) -> set[Path]:
+        with self._lock:
+            return {prepared.temp_directory for prepared in self._downloads.values()}
 
     def __len__(self) -> int:
         with self._lock:
