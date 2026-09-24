@@ -9,17 +9,34 @@ from app.runtime_config import (
 )
 
 
-def test_allowed_origins_default_to_local_frontend() -> None:
+def test_allowed_origins_default_to_local_and_production_frontends() -> None:
     assert allowed_origins_from_env("") == [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://vidorac.com",
+        "https://www.vidorac.com",
     ]
 
 
 def test_allowed_origins_are_normalized_and_deduplicated() -> None:
     assert allowed_origins_from_env(
         "https://vidorac.pages.dev/, https://www.vidorac.example, https://vidorac.pages.dev"
-    ) == ["https://vidorac.pages.dev", "https://www.vidorac.example"]
+    ) == [
+        "https://vidorac.pages.dev",
+        "https://www.vidorac.example",
+        "https://vidorac.com",
+        "https://www.vidorac.com",
+    ]
+
+
+def test_allowed_origins_preserve_configured_values_without_duplicating_production() -> None:
+    assert allowed_origins_from_env(
+        "https://vidorac.com, https://vidorac.pages.dev, https://www.vidorac.com/"
+    ) == [
+        "https://vidorac.com",
+        "https://vidorac.pages.dev",
+        "https://www.vidorac.com",
+    ]
 
 
 @pytest.mark.parametrize(

@@ -6,6 +6,10 @@ LOCAL_FRONTEND_ORIGINS = (
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 )
+PRODUCTION_FRONTEND_ORIGINS = (
+    "https://vidorac.com",
+    "https://www.vidorac.com",
+)
 SUPPORTED_PUBLIC_PLATFORMS = frozenset(
     {"tiktok", "instagram", "x", "reddit", "facebook"}
 )
@@ -14,7 +18,7 @@ SUPPORTED_PUBLIC_PLATFORMS = frozenset(
 def allowed_origins_from_env(value: str | None = None) -> list[str]:
     raw_value = os.getenv("VIDORAC_ALLOWED_ORIGINS") if value is None else value
     if not raw_value or not raw_value.strip():
-        return list(LOCAL_FRONTEND_ORIGINS)
+        return [*LOCAL_FRONTEND_ORIGINS, *PRODUCTION_FRONTEND_ORIGINS]
 
     origins: list[str] = []
     for raw_origin in raw_value.split(","):
@@ -32,6 +36,10 @@ def allowed_origins_from_env(value: str | None = None) -> list[str]:
             raise ValueError(
                 f"Invalid origin in VIDORAC_ALLOWED_ORIGINS: {raw_origin.strip()}"
             )
+        if origin not in origins:
+            origins.append(origin)
+
+    for origin in PRODUCTION_FRONTEND_ORIGINS:
         if origin not in origins:
             origins.append(origin)
 
