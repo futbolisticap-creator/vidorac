@@ -11,6 +11,7 @@ from app.analyzer import (
     AnalysisFailedError,
     AnalysisSourceBlockedError,
     AnalysisTemporaryError,
+    FacebookShareResolutionError,
     RedditShareResolutionError,
     YDL_OPTIONS,
     InvalidUrlError,
@@ -23,7 +24,9 @@ from app.analyzer import (
     extract_max_height,
     ensure_individual_media_url,
     normalize_url_for_extraction,
+    is_facebook_share_url,
     is_reddit_share_url,
+    resolve_facebook_share_url,
     resolve_reddit_share_url,
     validate_and_classify_url,
 )
@@ -228,6 +231,90 @@ class UrlValidationTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(UnsupportedCollectionUrlError):
                 ensure_individual_media_url(url, "reddit")
 
+    def test_facebook_canonical_reel_remains_accepted(self) -> None:
+        ensure_individual_media_url("https://www.facebook.com/reel/123456", "facebook")
+
+    def test_facebook_share_media_formats_are_recognized(self) -> None:
+        for url in (
+            "https://www.facebook.com/share/r/REEL_TOKEN/",
+            "https://www.facebook.com/share/v/VIDEO_TOKEN/",
+            "https://www.facebook.com/share/p/POST_TOKEN/",
+            "https://www.facebook.com/share/r/REEL_TOKEN/?mibextid=wwXIfr",
+        ):
+            with self.subTest(url=url):
+                self.assertTrue(is_facebook_share_url(url))
+                ensure_individual_media_url(url, "facebook")
+
+    def test_facebook_share_reel_resolves_and_reaches_existing_analyzer(self) -> None:
+        share_url = "https://www.facebook.com/share/r/REEL_TOKEN/?mibextid=wwXIfr"
+        canonical_url = "https://www.facebook.com/reel/123456"
+        expected = {"media_type": "video", "platform": "facebook"}
+        with (
+            patch("app.analyzer.resolve_facebook_share_url", return_value=canonical_url) as resolver,
+            patch("app.analyzer.analyze_media", return_value=expected) as analyzer,
+        ):
+            result = analyze_content(share_url)
+        self.assertEqual(result, expected)
+        resolver.assert_called_once_with(share_url)
+        analyzer.assert_called_once_with(canonical_url)
+
+    def test_facebook_share_resolution_follows_only_allowlisted_redirects(self) -> None:
+        share_url = "https://www.facebook.com/share/r/REEL_TOKEN/?mibextid=wwXIfr"
+        canonical_url = "https://www.facebook.com/reel/123456?mibextid=wwXIfr"
+        redirect = MagicMock()
+        redirect.is_redirect = True
+        redirect.is_permanent_redirect = False
+        redirect.status_code = 302
+        redirect.headers = {"Location": canonical_url}
+        final = MagicMock()
+        final.is_redirect = False
+        final.is_permanent_redirect = False
+        final.status_code = 200
+        final.headers = {}
+        session = MagicMock()
+        session.get.side_effect = [redirect, final]
+        public_address = [(2, 1, 6, "", ("157.240.241.17", 443))]
+        with patch("app.analyzer.socket.getaddrinfo", return_value=public_address):
+            resolved = resolve_facebook_share_url(share_url, session=session)
+        self.assertEqual(resolved, canonical_url)
+        self.assertEqual(session.get.call_count, 2)
+
+    def test_facebook_share_resolution_rejects_external_redirect(self) -> None:
+        share_url = "https://www.facebook.com/share/v/VIDEO_TOKEN/"
+        redirect = MagicMock()
+        redirect.is_redirect = True
+        redirect.is_permanent_redirect = False
+        redirect.status_code = 302
+        redirect.headers = {"Location": "https://attacker.example/internal"}
+        session = MagicMock()
+        session.get.return_value = redirect
+        public_address = [(2, 1, 6, "", ("157.240.241.17", 443))]
+        with (
+            patch("app.analyzer.socket.getaddrinfo", return_value=public_address),
+            self.assertRaises(FacebookShareResolutionError) as caught,
+        ):
+            resolve_facebook_share_url(share_url, session=session)
+        self.assertIn("outside Facebook", caught.exception.detail)
+
+    def test_facebook_share_resolution_rejects_private_network_addresses(self) -> None:
+        share_url = "https://www.facebook.com/share/p/POST_TOKEN/"
+        private_address = [(2, 1, 6, "", ("127.0.0.1", 443))]
+        with (
+            patch("app.analyzer.socket.getaddrinfo", return_value=private_address),
+            self.assertRaises(FacebookShareResolutionError) as caught,
+        ):
+            resolve_facebook_share_url(share_url, session=MagicMock())
+        self.assertIn("unsafe network address", caught.exception.detail)
+
+    def test_facebook_profiles_and_feeds_remain_rejected(self) -> None:
+        for url in (
+            "https://www.facebook.com/vidorac",
+            "https://www.facebook.com/vidorac/",
+            "https://www.facebook.com/groups/example/",
+        ):
+            with self.subTest(url=url), self.assertRaises(UnsupportedCollectionUrlError):
+                ensure_individual_media_url(url, "facebook")
+
     def test_normalizes_new_platforms_without_extractor_names(self) -> None:
         info = {
             "title": "Public test video",
@@ -367,6 +454,28 @@ class UrlValidationTests(unittest.TestCase):
             self.assertIn("YouTube extractor", caught.exception.technical_error or "")
 
 class AnalyzeEndpointErrorTests(unittest.TestCase):
+    def test_facebook_share_resolution_error_is_returned_without_profile_misclassification(self) -> None:
+        from app.main import AnalyzeRequest, analyze
+
+        detail = "This Facebook share link no longer resolves to an available post."
+        with patch(
+            "app.main.analyze_content",
+            side_effect=FacebookShareResolutionError(detail),
+        ):
+            response = asyncio.run(
+                analyze(
+                    AnalyzeRequest(
+                        url="https://www.facebook.com/share/r/REEL_TOKEN/",
+                        platform="facebook",
+                    )
+                )
+            )
+        payload = json.loads(response.body)
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(payload["detail"], detail)
+        self.assertNotIn("profile", payload["detail"].lower())
+        self.assertNotIn("wall", payload["detail"].lower())
+
     def test_diagnostic_request_id_is_validated_and_logged_without_media_url(self) -> None:
         from pydantic import ValidationError
         from app.main import AnalyzeRequest, analyze

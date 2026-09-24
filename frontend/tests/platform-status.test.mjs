@@ -21,6 +21,16 @@ test("Reddit share permalinks reach the backend resolver", () => {
   );
 });
 
+test("Facebook media share links reach the backend resolver unchanged", () => {
+  for (const url of [
+    "https://www.facebook.com/share/r/1DouC85Uoq/?mibextid=wwXIfr",
+    "https://www.facebook.com/share/v/VIDEO_TOKEN/",
+    "https://www.facebook.com/share/p/POST_TOKEN/",
+  ]) {
+    assert.deepEqual(getAnalyzerUrlDecision(url, "facebook"), { action: "analyze", platform: "facebook" });
+  }
+});
+
 test("cross-platform links are stopped before the API and identify the correct downloader", () => {
   assert.deepEqual(getAnalyzerUrlDecision("https://www.tiktok.com/@creator/video/123", "reddit"), { action: "wrong_platform", platform: "tiktok" });
   assert.deepEqual(getAnalyzerUrlDecision("https://www.instagram.com/reel/ABC/", "facebook"), { action: "wrong_platform", platform: "instagram" });

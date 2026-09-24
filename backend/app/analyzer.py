@@ -62,6 +62,11 @@ REDDIT_SHARE_HOSTS = frozenset(
 )
 REDDIT_SHARE_REDIRECT_LIMIT = 5
 REDDIT_SHARE_TIMEOUT = (4, 8)
+FACEBOOK_SHARE_HOSTS = frozenset(
+    {"facebook.com", "www.facebook.com", "m.facebook.com", "fb.watch"}
+)
+FACEBOOK_SHARE_REDIRECT_LIMIT = 5
+FACEBOOK_SHARE_TIMEOUT = (4, 8)
 
 
 class InvalidUrlError(ValueError):
@@ -77,6 +82,13 @@ class UnsupportedCollectionUrlError(UnsupportedUrlError):
 
 
 class RedditShareResolutionError(RuntimeError):
+    def __init__(self, detail: str, *, status_code: int = 422) -> None:
+        self.detail = detail
+        self.status_code = status_code
+        super().__init__(detail)
+
+
+class FacebookShareResolutionError(RuntimeError):
     def __init__(self, detail: str, *, status_code: int = 422) -> None:
         self.detail = detail
         self.status_code = status_code
@@ -305,7 +317,7 @@ def ensure_individual_media_url(url: str, platform: str) -> None:
         )
         is_group_post = bool(re.fullmatch(r"/groups/[^/]+/(?:posts|permalink)/[A-Za-z0-9._-]+", path))
         is_reel = bool(re.fullmatch(r"/(?:reel|reels)/[A-Za-z0-9._-]+", path))
-        is_shared_post = bool(re.fullmatch(r"/share/(?:v|p)/[A-Za-z0-9._-]+", path))
+        is_shared_post = bool(re.fullmatch(r"/share/(?:r|v|p)/[A-Za-z0-9._-]+", path))
         is_legacy_video = path in {"/video.php", "/story.php"} and bool(query.get("v") or query.get("story_fbid"))
         is_fb_watch = (hostname == "fb.watch" or hostname.endswith(".fb.watch")) and bool(re.fullmatch(r"/[A-Za-z0-9._-]+", path))
         if not any((is_watch, is_post_path, is_photo_path, is_photo_query, is_permalink, is_group_post, is_reel, is_shared_post, is_legacy_video, is_fb_watch)):
@@ -326,30 +338,70 @@ def is_reddit_share_url(url: str) -> bool:
     )
 
 
-def _validate_reddit_redirect_target(url: str) -> None:
+def is_facebook_share_url(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return False
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    path = parsed.path.rstrip("/") or "/"
+    return (
+        parsed.scheme.lower() in {"http", "https"}
+        and hostname in FACEBOOK_SHARE_HOSTS
+        and re.fullmatch(r"/share/(?:r|v|p)/[A-Za-z0-9._-]+", path) is not None
+    )
+
+
+def _validate_share_redirect_target(
+    url: str,
+    *,
+    allowed_hosts: frozenset[str],
+    service_name: str,
+    error_type: type[RedditShareResolutionError] | type[FacebookShareResolutionError],
+) -> None:
     try:
         parsed = urlsplit(url)
         hostname = (parsed.hostname or "").lower().rstrip(".")
         port = parsed.port
     except ValueError as exc:
-        raise RedditShareResolutionError("This Reddit share link returned an invalid redirect.") from exc
+        raise error_type(f"This {service_name} share link returned an invalid redirect.") from exc
     if (
         parsed.scheme.lower() != "https"
-        or hostname not in REDDIT_SHARE_HOSTS
+        or hostname not in allowed_hosts
         or parsed.username is not None
         or parsed.password is not None
         or (port is not None and port != 443)
     ):
-        raise RedditShareResolutionError("This Reddit share link redirected outside Reddit and could not be opened.")
+        raise error_type(
+            f"This {service_name} share link redirected outside {service_name} and could not be opened."
+        )
     try:
         addresses = {entry[4][0] for entry in socket.getaddrinfo(hostname, port or 443, type=socket.SOCK_STREAM)}
     except OSError as exc:
-        raise RedditShareResolutionError(
-            "Reddit could not be reached while resolving this share link.",
+        raise error_type(
+            f"{service_name} could not be reached while resolving this share link.",
             status_code=503,
         ) from exc
     if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
-        raise RedditShareResolutionError("This Reddit share link redirected to an unsafe network address.")
+        raise error_type(f"This {service_name} share link redirected to an unsafe network address.")
+
+
+def _validate_reddit_redirect_target(url: str) -> None:
+    _validate_share_redirect_target(
+        url,
+        allowed_hosts=REDDIT_SHARE_HOSTS,
+        service_name="Reddit",
+        error_type=RedditShareResolutionError,
+    )
+
+
+def _validate_facebook_redirect_target(url: str) -> None:
+    _validate_share_redirect_target(
+        url,
+        allowed_hosts=FACEBOOK_SHARE_HOSTS,
+        service_name="Facebook",
+        error_type=FacebookShareResolutionError,
+    )
 
 
 def resolve_reddit_share_url(
@@ -431,10 +483,96 @@ def resolve_reddit_share_url(
     raise RedditShareResolutionError("This Reddit share link exceeded the redirect limit.")
 
 
+def resolve_facebook_share_url(
+    url: str,
+    *,
+    session: requests.Session | None = None,
+) -> str:
+    if not is_facebook_share_url(url):
+        return url
+
+    current_url = url
+    owns_session = session is None
+    request_session = session or requests.Session()
+    try:
+        for _redirect in range(FACEBOOK_SHARE_REDIRECT_LIMIT + 1):
+            _validate_facebook_redirect_target(current_url)
+            try:
+                response = request_session.get(
+                    current_url,
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml",
+                        "User-Agent": "Vidorac/1.0 (+https://vidorac.com)",
+                    },
+                    stream=True,
+                    timeout=FACEBOOK_SHARE_TIMEOUT,
+                    allow_redirects=False,
+                )
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                raise FacebookShareResolutionError(
+                    "Facebook could not be reached while resolving this share link. Please try again.",
+                    status_code=503,
+                ) from exc
+            except requests.RequestException as exc:
+                raise FacebookShareResolutionError("This Facebook share link could not be resolved.") from exc
+
+            try:
+                if response.is_redirect or response.is_permanent_redirect:
+                    location = response.headers.get("Location")
+                    if not location:
+                        raise FacebookShareResolutionError(
+                            "This Facebook share link returned an invalid redirect."
+                        )
+                    current_url = urljoin(current_url, location)
+                    continue
+                if response.status_code in {401, 403}:
+                    raise FacebookShareResolutionError(
+                        "This Facebook post is private or requires authentication."
+                    )
+                if response.status_code in {404, 410}:
+                    raise FacebookShareResolutionError(
+                        "This Facebook share link no longer resolves to an available post."
+                    )
+                if response.status_code == 429:
+                    raise FacebookShareResolutionError(
+                        "Facebook temporarily rejected the share-link request. Please try again later.",
+                        status_code=429,
+                    )
+                if response.status_code in {502, 503, 504}:
+                    raise FacebookShareResolutionError(
+                        "Facebook is temporarily unavailable. Please try this share link again later.",
+                        status_code=503,
+                    )
+                if response.status_code != 200:
+                    raise FacebookShareResolutionError("This Facebook share link could not be resolved.")
+            finally:
+                response.close()
+
+            _validate_facebook_redirect_target(current_url)
+            try:
+                _validated_url, platform = validate_and_classify_url(current_url)
+                if platform != "facebook" or is_facebook_share_url(current_url):
+                    raise UnsupportedCollectionUrlError
+                ensure_individual_media_url(current_url, "facebook")
+            except (InvalidUrlError, UnsupportedUrlError) as exc:
+                raise FacebookShareResolutionError(
+                    "This Facebook share link did not resolve to an individual public post."
+                ) from exc
+            parsed = urlsplit(current_url)
+            return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ""))
+    finally:
+        if owns_session:
+            request_session.close()
+
+    raise FacebookShareResolutionError("This Facebook share link exceeded the redirect limit.")
+
+
 def prepare_url_for_extraction(url: str, platform: str) -> str:
     normalized_url = normalize_url_for_extraction(url, platform)
     if platform == "reddit":
         return resolve_reddit_share_url(normalized_url)
+    if platform == "facebook":
+        return resolve_facebook_share_url(normalized_url)
     return normalized_url
 
 
