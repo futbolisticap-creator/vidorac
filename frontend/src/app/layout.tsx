@@ -37,6 +37,9 @@ export const metadata: Metadata = {
   verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim()
     ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION.trim() }
     : undefined,
+  other: {
+    "google-adsense-account": "ca-pub-7538317164806269",
+  },
   icons: {
     icon: "/branding/vidorac-icon.svg",
     shortcut: "/branding/vidorac-icon.svg",
