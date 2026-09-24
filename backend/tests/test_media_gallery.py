@@ -109,6 +109,22 @@ class DetectionTests(unittest.TestCase):
             self.assertEqual(media["media_type"], "image" if len(extensions) == 1 else ("mixed" if "mp4" in extensions else "gallery"))
             self.assertEqual(media["item_count"], len(extensions))
 
+    def test_reddit_share_link_uses_resolved_post_for_gallery_extraction(self) -> None:
+        share_url = "https://www.reddit.com/r/example/s/SHARE_TOKEN"
+        canonical_url = "https://www.reddit.com/r/example/comments/abc123/example_post/"
+        with (
+            patch("app.media_gallery.prepare_url_for_extraction", return_value=canonical_url) as prepare,
+            patch(
+                "app.media_gallery._run_gallery_worker",
+                return_value=extraction("jpg", platform="reddit"),
+            ) as worker,
+        ):
+            result = extract_gallery_post(share_url)
+        self.assertEqual(result.platform, "reddit")
+        self.assertEqual(result.media_type, "image")
+        prepare.assert_called_once_with(share_url, "reddit")
+        worker.assert_called_once_with(canonical_url, "reddit")
+
     def test_x_video_falls_through_from_gallery_to_yt_dlp(self) -> None:
         video = {"media_type": "video", "platform": "x"}
         with (

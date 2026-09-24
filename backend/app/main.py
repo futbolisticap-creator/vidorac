@@ -21,6 +21,7 @@ from .analyzer import (
     AnalysisSourceBlockedError,
     AnalysisTemporaryError,
     InvalidUrlError,
+    RedditShareResolutionError,
     UnsupportedCollectionUrlError,
     UnsupportedUrlError,
     analyze_content,
@@ -322,6 +323,11 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
         return JSONResponse(
             status_code=400,
             content={"success": False, "detail": "Invalid URL."},
+        )
+    except RedditShareResolutionError as error:
+        return JSONResponse(
+            status_code=error.status_code,
+            content={"success": False, "detail": error.detail},
         )
     except UnsupportedCollectionUrlError:
         return JSONResponse(
@@ -675,6 +681,11 @@ async def prepare_download(
                 request.quality,
                 request.audio_bitrate,
             )
+    except RedditShareResolutionError as error:
+        return JSONResponse(
+            status_code=error.status_code,
+            content={"success": False, "detail": error.detail},
+        )
     except (DownloadPreparationError, GalleryError) as error:
         return download_error_response(error, platform=platform)
     except (InvalidUrlError, UnsupportedUrlError) as error:

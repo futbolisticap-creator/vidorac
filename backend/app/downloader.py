@@ -15,7 +15,7 @@ configure_windows_ca_bundle()
 
 import yt_dlp
 
-from .analyzer import ensure_individual_media_url, validate_and_classify_url
+from .analyzer import ensure_individual_media_url, prepare_url_for_extraction, validate_and_classify_url
 from .format_presets import infer_output_container, select_streams
 from .temp_files import cleanup_temp_directory, create_temp_directory, handoff_temp_directory
 from .tools.ffmpeg_runner import require_encoders, run_ffmpeg
@@ -361,6 +361,7 @@ def download_media(
     audio_bitrate: Mp3Bitrate | None = None,
 ) -> DownloadArtifact:
     url, platform = validate_and_classify_url(raw_url)
+    url = prepare_url_for_extraction(url, platform)
     ensure_individual_media_url(url, platform)
     temp_directory = create_temp_directory("clipora-")
     ffmpeg_available = is_ffmpeg_available()

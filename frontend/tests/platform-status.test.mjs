@@ -14,6 +14,13 @@ test("every downloader accepts its own approved host family", () => {
   for (const [platform, url] of cases) assert.deepEqual(getAnalyzerUrlDecision(url, platform), { action: "analyze", platform });
 });
 
+test("Reddit share permalinks reach the backend resolver", () => {
+  assert.deepEqual(
+    getAnalyzerUrlDecision("https://www.reddit.com/r/RateMyTortilla/s/M51X9cZ9Ud", "reddit"),
+    { action: "analyze", platform: "reddit" },
+  );
+});
+
 test("cross-platform links are stopped before the API and identify the correct downloader", () => {
   assert.deepEqual(getAnalyzerUrlDecision("https://www.tiktok.com/@creator/video/123", "reddit"), { action: "wrong_platform", platform: "tiktok" });
   assert.deepEqual(getAnalyzerUrlDecision("https://www.instagram.com/reel/ABC/", "facebook"), { action: "wrong_platform", platform: "instagram" });

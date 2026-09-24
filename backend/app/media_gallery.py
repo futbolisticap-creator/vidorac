@@ -21,7 +21,7 @@ from requests.adapters import HTTPAdapter
 from truststore import SSLContext
 from urllib3.util.retry import Retry
 
-from .analyzer import ensure_individual_media_url, normalize_url_for_extraction, validate_and_classify_url
+from .analyzer import ensure_individual_media_url, prepare_url_for_extraction, validate_and_classify_url
 from .downloader import DownloadArtifact, safe_download_name
 from .temp_files import cleanup_temp_directory, create_temp_directory, handoff_temp_directory
 
@@ -230,7 +230,7 @@ def _map_gallery_exception(exc: Exception, platform: str) -> GalleryAnalysisErro
 def _extract_gallery_post_direct(raw_url: str, platform: str | None = None) -> GalleryExtraction:
     url, actual_platform = validate_and_classify_url(raw_url)
     platform = platform or actual_platform
-    url = normalize_url_for_extraction(url, platform)
+    url = prepare_url_for_extraction(url, platform)
     ensure_individual_media_url(url, platform)
     if platform not in GALLERY_PLATFORMS:
         raise GalleryAnalysisError
@@ -422,7 +422,7 @@ def _run_gallery_worker(url: str, platform: str) -> GalleryExtraction:
 def extract_gallery_post(raw_url: str, platform: str | None = None) -> GalleryExtraction:
     url, actual_platform = validate_and_classify_url(raw_url)
     platform = platform or actual_platform
-    url = normalize_url_for_extraction(url, platform)
+    url = prepare_url_for_extraction(url, platform)
     ensure_individual_media_url(url, platform)
     if platform not in GALLERY_PLATFORMS:
         raise GalleryAnalysisError

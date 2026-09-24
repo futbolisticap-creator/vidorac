@@ -11,6 +11,7 @@ from app.analyzer import (
     AnalysisFailedError,
     AnalysisSourceBlockedError,
     AnalysisTemporaryError,
+    RedditShareResolutionError,
     YDL_OPTIONS,
     InvalidUrlError,
     UnsupportedCollectionUrlError,
@@ -22,6 +23,8 @@ from app.analyzer import (
     extract_max_height,
     ensure_individual_media_url,
     normalize_url_for_extraction,
+    is_reddit_share_url,
+    resolve_reddit_share_url,
     validate_and_classify_url,
 )
 from app.format_presets import get_effective_resolution
@@ -141,6 +144,89 @@ class UrlValidationTests(unittest.TestCase):
         for url, platform in invalid:
             with self.subTest(url=url), self.assertRaises(UnsupportedCollectionUrlError):
                 ensure_individual_media_url(url, platform)
+
+    def test_reddit_standard_permalink_remains_accepted(self) -> None:
+        ensure_individual_media_url(
+            "https://www.reddit.com/r/example/comments/abc123/example_post/",
+            "reddit",
+        )
+
+    def test_reddit_share_permalink_is_recognized(self) -> None:
+        self.assertTrue(
+            is_reddit_share_url("https://www.reddit.com/r/example/s/SHARE_TOKEN")
+        )
+
+    def test_reddit_share_permalink_resolves_and_is_processed_as_a_post(self) -> None:
+        share_url = "https://www.reddit.com/r/example/s/SHARE_TOKEN"
+        canonical_url = "https://www.reddit.com/r/example/comments/abc123/example_post/"
+        expected = {"media_type": "image", "platform": "reddit"}
+        with (
+            patch("app.analyzer.resolve_reddit_share_url", return_value=canonical_url) as resolver,
+            patch("app.media_gallery.analyze_gallery_post", return_value=expected) as gallery,
+        ):
+            result = analyze_content(share_url)
+        self.assertEqual(result, expected)
+        resolver.assert_called_once_with(share_url)
+        gallery.assert_called_once_with(canonical_url, "reddit")
+
+    def test_reddit_share_resolution_follows_only_reddit_redirects(self) -> None:
+        share_url = "https://www.reddit.com/r/example/s/SHARE_TOKEN"
+        canonical_url = "https://www.reddit.com/r/example/comments/abc123/example_post/?utm_source=share"
+        redirect = MagicMock()
+        redirect.is_redirect = True
+        redirect.is_permanent_redirect = False
+        redirect.status_code = 301
+        redirect.headers = {"Location": canonical_url}
+        final = MagicMock()
+        final.is_redirect = False
+        final.is_permanent_redirect = False
+        final.status_code = 200
+        final.headers = {}
+        session = MagicMock()
+        session.get.side_effect = [redirect, final]
+        public_address = [(2, 1, 6, "", ("151.101.1.140", 443))]
+        with patch("app.analyzer.socket.getaddrinfo", return_value=public_address):
+            resolved = resolve_reddit_share_url(share_url, session=session)
+        self.assertEqual(
+            resolved,
+            "https://www.reddit.com/r/example/comments/abc123/example_post/",
+        )
+        self.assertEqual(session.get.call_count, 2)
+
+    def test_reddit_share_resolution_rejects_non_reddit_redirect(self) -> None:
+        share_url = "https://www.reddit.com/r/example/s/SHARE_TOKEN"
+        redirect = MagicMock()
+        redirect.is_redirect = True
+        redirect.is_permanent_redirect = False
+        redirect.status_code = 301
+        redirect.headers = {"Location": "https://attacker.example/internal"}
+        session = MagicMock()
+        session.get.return_value = redirect
+        public_address = [(2, 1, 6, "", ("151.101.1.140", 443))]
+        with (
+            patch("app.analyzer.socket.getaddrinfo", return_value=public_address),
+            self.assertRaises(RedditShareResolutionError) as caught,
+        ):
+            resolve_reddit_share_url(share_url, session=session)
+        self.assertIn("outside Reddit", caught.exception.detail)
+
+    def test_reddit_share_resolution_rejects_private_network_addresses(self) -> None:
+        share_url = "https://www.reddit.com/r/example/s/SHARE_TOKEN"
+        private_address = [(2, 1, 6, "", ("127.0.0.1", 443))]
+        with (
+            patch("app.analyzer.socket.getaddrinfo", return_value=private_address),
+            self.assertRaises(RedditShareResolutionError) as caught,
+        ):
+            resolve_reddit_share_url(share_url, session=MagicMock())
+        self.assertIn("unsafe network address", caught.exception.detail)
+
+    def test_reddit_feeds_and_profiles_remain_rejected(self) -> None:
+        for url in (
+            "https://www.reddit.com/r/example/",
+            "https://www.reddit.com/user/example/",
+        ):
+            with self.subTest(url=url), self.assertRaises(UnsupportedCollectionUrlError):
+                ensure_individual_media_url(url, "reddit")
 
     def test_normalizes_new_platforms_without_extractor_names(self) -> None:
         info = {

@@ -1,17 +1,20 @@
+import ipaddress
 import logging
 import os
 import re
 import shutil
+import socket
 from collections.abc import Mapping
 from time import perf_counter
 from typing import Any
-from urllib.parse import parse_qs, urlsplit, urlunsplit
+from urllib.parse import parse_qs, urljoin, urlsplit, urlunsplit
 
 from .tls_certs import configure_windows_ca_bundle
 
 configure_windows_ca_bundle()
 
 import yt_dlp
+import requests
 
 from .format_presets import (
     display_video_codec,
@@ -54,6 +57,11 @@ YDL_OPTIONS: dict[str, Any] = {
     # Windows installations compatible with managed/root certificates.
     "compat_opts": {"no-certifi"},
 }
+REDDIT_SHARE_HOSTS = frozenset(
+    {"reddit.com", "www.reddit.com", "old.reddit.com", "new.reddit.com", "redd.it"}
+)
+REDDIT_SHARE_REDIRECT_LIMIT = 5
+REDDIT_SHARE_TIMEOUT = (4, 8)
 
 
 class InvalidUrlError(ValueError):
@@ -66,6 +74,13 @@ class UnsupportedUrlError(ValueError):
 
 class UnsupportedCollectionUrlError(UnsupportedUrlError):
     pass
+
+
+class RedditShareResolutionError(RuntimeError):
+    def __init__(self, detail: str, *, status_code: int = 422) -> None:
+        self.detail = detail
+        self.status_code = status_code
+        super().__init__(detail)
 
 
 class AnalysisFailedError(RuntimeError):
@@ -295,6 +310,132 @@ def ensure_individual_media_url(url: str, platform: str) -> None:
         is_fb_watch = (hostname == "fb.watch" or hostname.endswith(".fb.watch")) and bool(re.fullmatch(r"/[A-Za-z0-9._-]+", path))
         if not any((is_watch, is_post_path, is_photo_path, is_photo_query, is_permalink, is_group_post, is_reel, is_shared_post, is_legacy_video, is_fb_watch)):
             raise UnsupportedCollectionUrlError
+
+
+def is_reddit_share_url(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return False
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    path = parsed.path.rstrip("/") or "/"
+    return (
+        parsed.scheme.lower() in {"http", "https"}
+        and hostname in REDDIT_SHARE_HOSTS
+        and re.fullmatch(r"/r/[^/]+/s/[A-Za-z0-9_-]+", path) is not None
+    )
+
+
+def _validate_reddit_redirect_target(url: str) -> None:
+    try:
+        parsed = urlsplit(url)
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except ValueError as exc:
+        raise RedditShareResolutionError("This Reddit share link returned an invalid redirect.") from exc
+    if (
+        parsed.scheme.lower() != "https"
+        or hostname not in REDDIT_SHARE_HOSTS
+        or parsed.username is not None
+        or parsed.password is not None
+        or (port is not None and port != 443)
+    ):
+        raise RedditShareResolutionError("This Reddit share link redirected outside Reddit and could not be opened.")
+    try:
+        addresses = {entry[4][0] for entry in socket.getaddrinfo(hostname, port or 443, type=socket.SOCK_STREAM)}
+    except OSError as exc:
+        raise RedditShareResolutionError(
+            "Reddit could not be reached while resolving this share link.",
+            status_code=503,
+        ) from exc
+    if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+        raise RedditShareResolutionError("This Reddit share link redirected to an unsafe network address.")
+
+
+def resolve_reddit_share_url(
+    url: str,
+    *,
+    session: requests.Session | None = None,
+) -> str:
+    if not is_reddit_share_url(url):
+        return url
+
+    current_url = url
+    owns_session = session is None
+    request_session = session or requests.Session()
+    try:
+        for _redirect in range(REDDIT_SHARE_REDIRECT_LIMIT + 1):
+            _validate_reddit_redirect_target(current_url)
+            try:
+                response = request_session.get(
+                    current_url,
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml",
+                        "User-Agent": "Vidorac/1.0 (+https://vidorac.com)",
+                    },
+                    stream=True,
+                    timeout=REDDIT_SHARE_TIMEOUT,
+                    allow_redirects=False,
+                )
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                raise RedditShareResolutionError(
+                    "Reddit could not be reached while resolving this share link. Please try again.",
+                    status_code=503,
+                ) from exc
+            except requests.RequestException as exc:
+                raise RedditShareResolutionError("This Reddit share link could not be resolved.") from exc
+
+            try:
+                if response.is_redirect or response.is_permanent_redirect:
+                    location = response.headers.get("Location")
+                    if not location:
+                        raise RedditShareResolutionError("This Reddit share link returned an invalid redirect.")
+                    current_url = urljoin(current_url, location)
+                    continue
+                if response.status_code in {401, 403}:
+                    raise RedditShareResolutionError("This Reddit post is private or restricted.")
+                if response.status_code in {404, 410}:
+                    raise RedditShareResolutionError("This Reddit share link no longer resolves to an available post.")
+                if response.status_code == 429:
+                    raise RedditShareResolutionError(
+                        "Reddit temporarily rejected the share-link request. Please try again later.",
+                        status_code=429,
+                    )
+                if response.status_code in {502, 503, 504}:
+                    raise RedditShareResolutionError(
+                        "Reddit is temporarily unavailable. Please try this share link again later.",
+                        status_code=503,
+                    )
+                if response.status_code != 200:
+                    raise RedditShareResolutionError("This Reddit share link could not be resolved.")
+            finally:
+                response.close()
+
+            _validate_reddit_redirect_target(current_url)
+            try:
+                _validated_url, platform = validate_and_classify_url(current_url)
+                if platform != "reddit" or is_reddit_share_url(current_url):
+                    raise UnsupportedCollectionUrlError
+                ensure_individual_media_url(current_url, "reddit")
+            except (InvalidUrlError, UnsupportedUrlError) as exc:
+                raise RedditShareResolutionError(
+                    "This Reddit share link did not resolve to an individual public post."
+                ) from exc
+            parsed = urlsplit(current_url)
+            normalized_path = f"{parsed.path.rstrip('/')}/"
+            return urlunsplit((parsed.scheme, parsed.netloc, normalized_path, "", ""))
+    finally:
+        if owns_session:
+            request_session.close()
+
+    raise RedditShareResolutionError("This Reddit share link exceeded the redirect limit.")
+
+
+def prepare_url_for_extraction(url: str, platform: str) -> str:
+    normalized_url = normalize_url_for_extraction(url, platform)
+    if platform == "reddit":
+        return resolve_reddit_share_url(normalized_url)
+    return normalized_url
 
 
 def _prefers_gallery_detection(url: str, platform: str) -> bool:
@@ -563,7 +704,7 @@ def build_quality_options(info: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 def analyze_media(raw_url: str) -> dict[str, Any]:
     url, platform = validate_and_classify_url(raw_url)
-    url = normalize_url_for_extraction(url, platform)
+    url = prepare_url_for_extraction(url, platform)
     ensure_individual_media_url(url, platform)
 
     try:
@@ -643,7 +784,7 @@ def analyze_content(raw_url: str) -> dict[str, Any]:
     url, platform = validate_and_classify_url(raw_url)
     _timing("url validation and platform detection", validation_started)
     normalization_started = perf_counter()
-    url = normalize_url_for_extraction(url, platform)
+    url = prepare_url_for_extraction(url, platform)
     _timing(f"{platform} normalization", normalization_started)
     ensure_individual_media_url(url, platform)
 
