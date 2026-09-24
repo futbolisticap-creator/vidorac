@@ -1938,7 +1938,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .home-page .hub-platform-card .platform-card-cta:active { transform: translateY(0); }
 .home-page .hub-platform-card .platform-card-cta:focus-visible { border-radius: 11px; outline: 2px solid #8fe1ff; outline-offset: 3px; }
-.platform-card-arrow { font-size: 1.12rem; transition: transform 200ms ease; }
+.platform-card-arrow { flex: 0 0 auto; margin-left: auto; font-size: 1.12rem; transition: transform 200ms ease; }
 .platform-card-cta:hover .platform-card-arrow { transform: translateX(3px); }
 
 .home-inline-ad {
@@ -2340,12 +2340,22 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 
 .other-downloader-card > a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-.other-downloader-arrow { flex: 0 0 auto; font-size: 1rem; transition: transform 200ms ease; }
+.other-downloader-arrow { flex: 0 0 auto; margin-left: auto; font-size: 1rem; transition: transform 200ms ease; }
 .other-downloader-card > a:hover .other-downloader-arrow { transform: translateX(3px); }
 
 .other-downloaders-all {
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-top: 1.25rem;
   margin-bottom: 0;
+  padding: 0.68rem 1rem;
+  border: 1px solid rgba(116, 170, 207, 0.24);
+  border-radius: 11px;
+  background: rgba(12, 29, 48, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  color: #8edcff;
 }
 
 .other-downloaders-all > span:first-child {
@@ -2356,6 +2366,18 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .other-downloaders-all:hover > span:first-child { transform: none; }
 .other-downloaders-all:hover .other-downloader-arrow { transform: translateX(3px); }
+
+.other-downloaders-all:hover {
+  border-color: rgba(104, 211, 255, 0.42);
+  background: rgba(19, 42, 68, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #c6efff;
+}
+
+.other-downloaders-all:active {
+  background: rgba(10, 25, 42, 0.9);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16);
+}
 
 @media (max-width: 1023px) {
   .other-downloaders-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2375,8 +2397,12 @@ button { -webkit-tap-highlight-color: transparent; }
 /* Shared secondary CTA treatment for homepage and cross-platform cards */
 .home-page .hub-platform-card .secondary-card-cta,
 .other-downloader-card > .secondary-card-cta {
+  display: flex;
   width: 100%;
   min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.68rem 1rem;
   border: 1px solid rgba(116, 170, 207, 0.24);
   border-radius: 11px;
@@ -2414,9 +2440,10 @@ button { -webkit-tap-highlight-color: transparent; }
   font-family: Georgia, "Times New Roman", serif;
   font-size: 15px;
   font-style: normal;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.015em;
-  line-height: 1;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 @media (max-width: 390px) {
