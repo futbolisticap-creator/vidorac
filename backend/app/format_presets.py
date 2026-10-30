@@ -81,6 +81,7 @@ def select_streams(
     quality: str,
     *,
     ffmpeg_available: bool,
+    mp4_only: bool = False,
 ) -> StreamSelection | None:
     """Mirror the ordered yt-dlp selector branches used by the downloader."""
     resolution_limit = QUALITY_RESOLUTION_LIMITS[quality]
@@ -94,6 +95,32 @@ def select_streams(
     video_only = [item for item in formats if within_limit(item) and _has_stream(item, "vcodec") and not _has_stream(item, "acodec") and not _is_unknown_direct_media(item)]
     combined = [item for item in formats if within_limit(item) and ((_has_stream(item, "vcodec") and _has_stream(item, "acodec")) or _is_unknown_direct_media(item))]
     audio_only = [item for item in formats if _has_stream(item, "acodec") and not _has_stream(item, "vcodec")]
+
+    if mp4_only:
+        mp4_video = [item for item in video_only if item.get("ext") == "mp4"]
+        aac_audio = [
+            item for item in audio_only
+            if item.get("ext") in {"m4a", "mp4"}
+            and str(item.get("acodec", "")).lower().startswith(("mp4a", "aac"))
+        ]
+        combined_mp4 = [
+            item for item in combined
+            if item.get("ext") == "mp4" and _has_stream(item, "acodec")
+        ]
+        if quality == "compatible":
+            mp4_video = [
+                item for item in mp4_video
+                if str(item.get("vcodec", "")).lower().startswith(("avc1", "h264"))
+            ]
+            combined_mp4 = [
+                item for item in combined_mp4
+                if str(item.get("vcodec", "")).lower().startswith(("avc1", "h264"))
+            ]
+        if ffmpeg_available and mp4_video and aac_audio:
+            return StreamSelection(_best(mp4_video), _best(aac_audio))  # type: ignore[arg-type]
+        if combined_mp4:
+            return StreamSelection(_best(combined_mp4), None)  # type: ignore[arg-type]
+        return None
 
     if quality == "compatible":
         h264_video = [

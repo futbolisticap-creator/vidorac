@@ -10,6 +10,7 @@ export type PlatformSlug =
   | "facebook"
   | "reddit"
   | "x"
+  | "youtube"
   | "tiktok-downloader"
   | "tiktok-mp3-downloader"
   | "tiktok-slideshow-downloader";
@@ -26,6 +27,7 @@ export const platformLinks: Array<{
   { slug: "facebook", name: "Facebook", media: "Public videos & Reels" },
   { slug: "reddit", name: "Reddit", media: "Videos & post media" },
   { slug: "x", name: "X / Twitter", media: "Public post videos" },
+  { slug: "youtube", name: "YouTube", media: "Public videos, Shorts & MP3" },
 ];
 
 export function platformMetadata({

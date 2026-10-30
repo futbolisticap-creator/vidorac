@@ -261,6 +261,20 @@ def validate_and_classify_url(raw_url: str) -> tuple[str, str]:
 
 def normalize_url_for_extraction(url: str, platform: str) -> str:
     """Remove non-identifying Instagram tracking data after host validation."""
+    if platform == "youtube":
+        parsed = urlsplit(url)
+        hostname = (parsed.hostname or "").lower().rstrip(".")
+        if hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}:
+            return url
+        path = parsed.path.rstrip("/")
+        video_id = path.removeprefix("/") if hostname == "youtu.be" else (
+            parse_qs(parsed.query).get("v", [""])[0] if path == "/watch"
+            else path.removeprefix("/shorts/") if path.startswith("/shorts/")
+            else ""
+        )
+        if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+            return f"https://www.youtube.com/watch?v={video_id}"
+        return url
     if platform != "instagram":
         return url
     parsed = urlsplit(url)
@@ -282,7 +296,15 @@ def ensure_individual_media_url(url: str, platform: str) -> None:
     hostname = (parsed.hostname or "").lower().rstrip(".")
     path = parsed.path.rstrip("/") or "/"
 
-    if platform == "instagram":
+    if platform == "youtube":
+        video_id = parse_qs(parsed.query).get("v", [""])[0] if path == "/watch" else ""
+        if hostname not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"} or not (
+            (hostname == "youtu.be" and re.fullmatch(r"/[A-Za-z0-9_-]{11}", path))
+            or (hostname != "youtu.be" and path == "/watch" and re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id))
+            or (hostname != "youtu.be" and re.fullmatch(r"/shorts/[A-Za-z0-9_-]{11}", path))
+        ):
+            raise UnsupportedCollectionUrlError
+    elif platform == "instagram":
         if not re.fullmatch(r"/(?:p|reel|reels|tv)/[A-Za-z0-9_-]+", path):
             raise UnsupportedCollectionUrlError
     elif platform == "tiktok":
@@ -755,14 +777,17 @@ def extract_source_audio_metadata(info: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def build_quality_options(info: Mapping[str, Any]) -> list[dict[str, Any]]:
+def build_quality_options(info: Mapping[str, Any], *, platform: str | None = None) -> list[dict[str, Any]]:
     formats = [item for item in info.get("formats") or [] if isinstance(item, Mapping)]
     duration = _positive_number(info.get("duration"))
     best_audio = _pick_format(formats, audio_only=True)
     ffmpeg_available = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
 
     def video_option(option_id: str, label: str, height_limit: int | None) -> dict[str, Any]:
-        selection = select_streams(formats, option_id, ffmpeg_available=ffmpeg_available)
+        selection = select_streams(
+            formats, option_id, ffmpeg_available=ffmpeg_available,
+            mp4_only=platform == "youtube",
+        )
         selected_resolution = get_effective_resolution(selection.video) if selection else None
         estimated_parts = (
             [_estimated_format_size(selection.video, duration)]
@@ -830,7 +855,7 @@ def build_quality_options(info: Mapping[str, Any]) -> list[dict[str, Any]]:
         {
             "id": "mp3",
             "label": "MP3",
-            "available": has_audio and (mp3_size is None or mp3_size <= MAX_ANALYZED_DOWNLOAD_SIZE),
+            "available": has_audio and ffmpeg_available and (mp3_size is None or mp3_size <= MAX_ANALYZED_DOWNLOAD_SIZE),
             "resolution": None,
             "container": "MP3",
             "video_codec": None,
@@ -912,7 +937,7 @@ def analyze_media(raw_url: str) -> dict[str, Any]:
         "webpage_url": _optional_string(info.get("webpage_url")) or url,
         "max_height": extract_max_height(info),
         **extract_source_audio_metadata(info),
-        "quality_options": build_quality_options(info),
+        "quality_options": build_quality_options(info, platform=platform),
     }
 
 

@@ -11,7 +11,7 @@ PRODUCTION_FRONTEND_ORIGINS = (
     "https://www.vidorac.com",
 )
 SUPPORTED_PUBLIC_PLATFORMS = frozenset(
-    {"tiktok", "instagram", "x", "reddit", "facebook"}
+    {"tiktok", "instagram", "x", "reddit", "facebook", "youtube"}
 )
 
 

@@ -52,6 +52,12 @@ export default function PlatformBrandIcon({ platform }: PlatformBrandIconProps) 
           <path fill="#fff" d="M6.45 6h3.43l2.8 3.75L15.96 6h1.58l-4.13 4.93L17.8 18h-3.42l-3.08-4.13L7.84 18H6.25l4.32-5.31L6.45 6Zm2.76 1.13H8.7l6.34 9.74h.52L9.21 7.13Z" />
         </svg>
       )}
+      {platform === "youtube" && (
+        <svg {...sharedSvgProps}>
+          <rect x="2" y="5" width="20" height="14" rx="4.5" fill="#FF0033" />
+          <path d="m10 8.4 6 3.6-6 3.6V8.4Z" fill="#fff" />
+        </svg>
+      )}
     </span>
   );
 }

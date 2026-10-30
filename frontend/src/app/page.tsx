@@ -9,11 +9,11 @@ import { OG_IMAGE_ALT, OG_IMAGE_PATH, SITE_URL } from "./seo";
 import { TelegramHomepageCard } from "./telegram-promotion";
 
 export const metadata: Metadata = {
-  title: { absolute: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X" },
+  title: { absolute: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube" },
   description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
   alternates: { canonical: `${SITE_URL}/` },
   openGraph: {
-    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
     description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
     url: `${SITE_URL}/`,
     siteName: "Vidorac",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
     description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
     images: [OG_IMAGE_PATH],
   },
@@ -35,7 +35,7 @@ const steps = [
 ];
 
 const features = [
-  ["Multiple platforms", "Choose from five focused social-platform downloaders."],
+  ["Multiple platforms", "Choose from six focused platform downloaders."],
   ["Quality options", "Select from the formats and qualities genuinely available."],
   ["Mobile friendly", "Use a clear, responsive interface across screen sizes."],
   ["No installation", "Open Vidorac directly in a modern browser."],
@@ -49,6 +49,7 @@ const ctaNames = {
   facebook: "Facebook",
   reddit: "Reddit",
   x: "X",
+  youtube: "YouTube",
 } as const;
 
 export default function Home() {

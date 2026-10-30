@@ -16,7 +16,7 @@ export type VideoMetadata = {
   thumbnail: string | null;
   duration: number | null;
   uploader: string | null;
-  platform: "tiktok" | "instagram" | "x" | "reddit" | "facebook";
+  platform: "tiktok" | "instagram" | "x" | "reddit" | "facebook" | "youtube";
   webpage_url: string | null;
   max_height: number | null;
   source_audio_codec: string | null;
@@ -72,7 +72,7 @@ export async function readClipboardTextSafely(
 }
 
 type UnknownRecord = Record<string, unknown>;
-const VIDEO_PLATFORMS = ["tiktok", "instagram", "x", "reddit", "facebook"] as const;
+const VIDEO_PLATFORMS = ["tiktok", "instagram", "x", "reddit", "facebook", "youtube"] as const;
 const GALLERY_PLATFORMS = ["tiktok", "instagram", "x", "reddit", "facebook"] as const;
 const QUALITY_IDS = ["best", "compatible", "1080", "720", "480", "audio", "mp3"] as const;
 

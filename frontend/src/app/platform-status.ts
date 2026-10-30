@@ -1,4 +1,4 @@
-export type PlatformId = "tiktok" | "instagram" | "facebook" | "reddit" | "x";
+export type PlatformId = "tiktok" | "instagram" | "facebook" | "reddit" | "x" | "youtube";
 
 export type AnalyzerUrlDecision =
   | { action: "analyze"; platform: PlatformId }
@@ -17,6 +17,7 @@ export const platformHosts: Record<PlatformId, readonly string[]> = {
   facebook: ["facebook.com", "fb.watch"],
   reddit: ["reddit.com", "redd.it", "v.redd.it"],
   x: ["x.com", "twitter.com"],
+  youtube: ["youtube.com", "youtu.be"],
 };
 
 export const platformNames: Record<PlatformId, string> = {
@@ -25,6 +26,7 @@ export const platformNames: Record<PlatformId, string> = {
   facebook: "Facebook",
   reddit: "Reddit",
   x: "X / Twitter",
+  youtube: "YouTube",
 };
 
 export const platformPaths: Record<PlatformId, string> = {
@@ -33,6 +35,7 @@ export const platformPaths: Record<PlatformId, string> = {
   facebook: "/facebook",
   reddit: "/reddit",
   x: "/x",
+  youtube: "/youtube",
 };
 
 function matchesHostname(hostname: string, allowedHost: string): boolean {

@@ -55,7 +55,7 @@ export default function PrivacyPage() {
 
       <section>
         <h2>External platforms</h2>
-        <p>Vidorac processes public links from supported platforms—TikTok, Instagram, Facebook, Reddit and X—to identify media and available formats. Vidorac is independent and is not affiliated with or endorsed by those platforms; their terms and privacy policies continue to apply.</p>
+        <p>Vidorac processes public links from supported platforms—TikTok, Instagram, Facebook, Reddit, X and YouTube—to identify media and available formats. Vidorac is independent and is not affiliated with or endorsed by those platforms; their terms and privacy policies continue to apply.</p>
       </section>
 
       <section>

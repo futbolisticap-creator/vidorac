@@ -231,6 +231,7 @@ def build_orientation_aware_format_selector(
     quality: DownloadQuality,
     *,
     ffmpeg_available: bool,
+    mp4_only: bool = False,
 ) -> Callable[[dict[str, Any]], Iterable[dict[str, Any]]]:
     """Select the same orientation-aware streams advertised by the analyzer."""
 
@@ -244,6 +245,7 @@ def build_orientation_aware_format_selector(
             formats,
             quality.value,
             ffmpeg_available=ffmpeg_available,
+            mp4_only=mp4_only,
         )
         if selection is None:
             return
@@ -259,7 +261,7 @@ def build_orientation_aware_format_selector(
         video_protocol = str(video.get("protocol") or "https")
         audio_protocol = str(audio.get("protocol") or "https")
         output_extension = infer_output_container(selection) or str(video.get("ext") or "mkv")
-        if quality is DownloadQuality.COMPATIBLE:
+        if quality is DownloadQuality.COMPATIBLE or mp4_only:
             output_extension = "mp4"
         yield {
             "format_id": f"{video_id}+{audio_id}",
@@ -277,6 +279,8 @@ def build_ydl_options(
     *,
     ffmpeg_available: bool,
     audio_bitrate: Mp3Bitrate = DEFAULT_MP3_BITRATE,
+    platform: str | None = None,
+    progress_callback: Callable[[str, int | None], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, str | None]]:
     limit_state: dict[str, str | None] = {"reason": None}
 
@@ -315,6 +319,15 @@ def build_ydl_options(
         ):
             limit_state["reason"] = "filesize"
             raise yt_dlp.utils.DownloadCancelled("Download exceeds Vidorac's file-size limit")
+        if progress_callback is not None:
+            total = status.get("total_bytes") or status.get("total_bytes_estimate")
+            downloaded = status.get("downloaded_bytes")
+            percent = (
+                min(100, max(0, round(downloaded * 100 / total)))
+                if isinstance(downloaded, (int, float)) and isinstance(total, (int, float)) and total > 0
+                else None
+            )
+            progress_callback("downloading" if status.get("status") == "downloading" else "processing", percent)
 
     options: dict[str, Any] = {
         "quiet": True,
@@ -348,9 +361,10 @@ def build_ydl_options(
         options["format"] = build_orientation_aware_format_selector(
             quality,
             ffmpeg_available=ffmpeg_available,
+            mp4_only=platform == "youtube",
         )
         if ffmpeg_available:
-            options["merge_output_format"] = "mp4" if quality is DownloadQuality.COMPATIBLE else "mp4/mkv"
+            options["merge_output_format"] = "mp4" if quality is DownloadQuality.COMPATIBLE or platform == "youtube" else "mp4/mkv"
 
     return options, limit_state
 
@@ -359,6 +373,8 @@ def download_media(
     raw_url: str,
     quality: DownloadQuality,
     audio_bitrate: Mp3Bitrate | None = None,
+    *,
+    progress_callback: Callable[[str, int | None], None] | None = None,
 ) -> DownloadArtifact:
     url, platform = validate_and_classify_url(raw_url)
     url = prepare_url_for_extraction(url, platform)
@@ -372,6 +388,8 @@ def download_media(
             temp_directory,
             ffmpeg_available=ffmpeg_available,
             audio_bitrate=audio_bitrate or DEFAULT_MP3_BITRATE,
+            platform=platform,
+            progress_callback=progress_callback,
         )
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -384,6 +402,8 @@ def download_media(
             raise MediaUnavailableError
 
         if quality is DownloadQuality.MP3:
+            if progress_callback is not None:
+                progress_callback("converting", None)
             source_path = _find_downloaded_audio_source(temp_directory)
             output_path = _encode_mp3(
                 source_path,
@@ -393,6 +413,8 @@ def download_media(
         elif quality is DownloadQuality.ORIGINAL_AUDIO:
             output_path = _find_downloaded_audio_source(temp_directory)
         else:
+            if progress_callback is not None:
+                progress_callback("processing", None)
             output_path = _find_output_file(temp_directory, quality)
         if output_path.stat().st_size > MAX_FILESIZE_BYTES:
             raise FileSizeLimitError

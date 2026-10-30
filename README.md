@@ -1,6 +1,6 @@
 # Vidorac Public Beta
 
-Vidorac is a public-media downloader hub for TikTok, Instagram, Facebook, Reddit, and X / Twitter. It connects a Next.js interface to one shared FastAPI backend, uses yt-dlp for video/audio, gallery-dl for compatible post media, and delegates safe merging and MP3 conversion to FFmpeg.
+Vidorac is a public-media downloader hub for TikTok, Instagram, Facebook, Reddit, X / Twitter, and YouTube. It connects a Next.js interface to one shared FastAPI backend, uses yt-dlp for video/audio, gallery-dl for compatible post media, and delegates safe merging and MP3 conversion to FFmpeg.
 
 ## Project structure
 
@@ -23,15 +23,15 @@ The project directory may still be named `Clipora` locally while the product and
 
 ## Public product support
 
-- Five focused routes: `/tiktok`, `/instagram`, `/facebook`, `/reddit`, and `/x`
+- Six focused routes: `/tiktok`, `/instagram`, `/facebook`, `/reddit`, `/x`, and `/youtube`
 - One shared FastAPI, yt-dlp, gallery-dl, and FFmpeg pipeline
 - Real available video-quality choices and MP3 conversion when an audio stream is available
 - Compatible public photo, slideshow, carousel, and gallery downloads
 - Strict platform isolation in both the browser and API
 
-Only individual public posts are accepted by the website. Profiles, feeds, private content, and login-dependent posts are rejected. Downloads are limited to 250 MB. No cookies, private sessions, or login data are used.
+Only individual public posts or YouTube videos are accepted by the website. Profiles, feeds, playlists, private content, and login-dependent media are rejected. Downloads are limited to 250 MB. No cookies, private sessions, or login data are used.
 
-Production enables the five public platforms with `VIDORAC_PUBLIC_PLATFORMS=tiktok,instagram,facebook,reddit,x`. Every page supplies its expected platform, and the backend independently detects the URL hostname before invoking the shared extraction pipeline.
+Production enables the six public platforms with `VIDORAC_PUBLIC_PLATFORMS=tiktok,instagram,facebook,reddit,x,youtube`. Every page supplies its expected platform, and the backend independently detects the URL hostname before invoking the shared extraction pipeline.
 
 ## Run the frontend
 
@@ -198,7 +198,7 @@ Render uses:
 VIDORAC_ENV=production
 VIDORAC_ALLOWED_ORIGINS=https://<real-cloudflare-project>.pages.dev
 VIDORAC_MAX_CONCURRENT_JOBS=2
-VIDORAC_PUBLIC_PLATFORMS=tiktok,instagram,facebook,reddit,x
+VIDORAC_PUBLIC_PLATFORMS=tiktok,instagram,facebook,reddit,x,youtube
 VIDORAC_PREPARATION_RATE_LIMIT=12
 ```
 

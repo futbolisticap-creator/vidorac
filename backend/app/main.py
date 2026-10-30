@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import re
@@ -10,7 +11,7 @@ from typing import Annotated, AsyncIterator, Literal
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, StrictInt, field_validator, model_validator
 from starlette.background import BackgroundTask
 
@@ -26,6 +27,7 @@ from .analyzer import (
     UnsupportedCollectionUrlError,
     UnsupportedUrlError,
     analyze_content,
+    ensure_individual_media_url,
     validate_and_classify_url,
 )
 from .downloader import (
@@ -215,7 +217,7 @@ app.add_middleware(
 )
 
 
-PublicPlatform = Literal["tiktok", "instagram", "facebook", "reddit", "x"]
+PublicPlatform = Literal["tiktok", "instagram", "facebook", "reddit", "x", "youtube"]
 
 
 class AnalyzeRequest(BaseModel):
@@ -287,6 +289,7 @@ PLATFORM_LABELS: dict[str, str] = {
     "facebook": "Facebook",
     "reddit": "Reddit",
     "x": "X / Twitter",
+    "youtube": "YouTube",
 }
 
 
@@ -340,7 +343,7 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
             status_code=400,
             content={
                 "success": False,
-                "detail": "Unsupported URL. Use a TikTok, Instagram, Facebook, Reddit or X link.",
+                "detail": "Unsupported URL. Use a TikTok, Instagram, Facebook, Reddit, X or YouTube link.",
             },
         )
     except GalleryTooManyItemsError:
@@ -422,7 +425,7 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
             status_code=422,
             content={
                 "success": False,
-                "detail": "This post could not be analyzed.",
+                "detail": "This YouTube video could not be analyzed." if request.platform == "youtube" else "This post could not be analyzed.",
             },
         )
 
@@ -446,7 +449,7 @@ def download_error_response(error: Exception, *, platform: str | None = None) ->
             status_code=400,
             content={
                 "success": False,
-                "detail": "Unsupported URL. Use a TikTok, Instagram, Facebook, Reddit or X link.",
+                "detail": "Unsupported URL. Use a TikTok, Instagram, Facebook, Reddit, X or YouTube link.",
             },
         )
     if isinstance(error, FFmpegRequiredError):
@@ -708,6 +711,85 @@ async def prepare_download(
         "filename": prepared.filename,
         "content_type": prepared.content_type,
     }
+
+
+@app.post("/api/download/prepare-stream", response_model=None)
+async def prepare_youtube_stream(
+    request: DownloadRequest,
+    http_request: Request,
+) -> StreamingResponse | JSONResponse:
+    """Stream actual yt-dlp preparation progress for one YouTube download."""
+    if not preparation_rate_limiter.allow(request_client_key(http_request)):
+        return JSONResponse(status_code=429, content={"success": False, "detail": "Too many download requests. Please wait a few minutes and try again."})
+    try:
+        _url, platform = validate_and_classify_url(request.url)
+        if platform != "youtube" or platform not in PUBLIC_PLATFORMS:
+            return JSONResponse(status_code=400, content={"success": False, "detail": "Use a public YouTube video link."})
+        if request.platform != platform:
+            return platform_mismatch_response(request.platform, platform)
+        ensure_individual_media_url(request.url, platform)
+        if request.quality is None or request.item_indices is not None or request.archive:
+            return JSONResponse(status_code=400, content={"success": False, "detail": "Choose one video or audio format."})
+    except (InvalidUrlError, UnsupportedUrlError) as error:
+        return download_error_response(error)
+
+    async def events() -> AsyncIterator[str]:
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[dict[str, object] | None] = asyncio.Queue()
+        disconnected = threading.Event()
+        last_progress: tuple[str, int | None] | None = None
+
+        def report(stage: str, percent: int | None) -> None:
+            nonlocal last_progress
+            current = (stage, percent)
+            if current != last_progress and not disconnected.is_set():
+                last_progress = current
+                loop.call_soon_threadsafe(queue.put_nowait, {"type": "progress", "stage": stage, "percent": percent})
+
+        async def worker() -> None:
+            try:
+                artifact = await asyncio.to_thread(
+                    run_heavy_job, download_media, request.url, request.quality,
+                    request.audio_bitrate, progress_callback=report,
+                )
+                if disconnected.is_set():
+                    await asyncio.to_thread(cleanup_temp_directory, artifact.temp_directory)
+                    return
+                try:
+                    download_id, prepared = prepared_downloads.register(artifact)
+                except Exception:
+                    await asyncio.to_thread(cleanup_temp_directory, artifact.temp_directory)
+                    logging.getLogger("clipora.download").exception("Could not register a prepared YouTube download")
+                    raise DownloadPreparationError
+                await queue.put({"type": "ready", "download_id": download_id, "filename": prepared.filename, "content_type": prepared.content_type})
+            except DownloadPreparationError as error:
+                response = download_error_response(error, platform="youtube")
+                detail = json.loads(response.body).get("detail", "We couldn't prepare this download.")
+                await queue.put({"type": "error", "detail": detail})
+            except Exception:
+                logging.getLogger("clipora.download").exception("Unexpected YouTube preparation error")
+                await queue.put({"type": "error", "detail": "We couldn't prepare this download."})
+            finally:
+                await queue.put(None)
+
+        task = asyncio.create_task(worker())
+        try:
+            yield f"data: {json.dumps({'type': 'progress', 'stage': 'starting', 'percent': None})}\n\n"
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield f"data: {json.dumps(event)}\n\n"
+        finally:
+            disconnected.set()
+            # The worker finishes its bounded job and cleans any unclaimed file.
+            if task.done():
+                task.result()
+
+    return StreamingResponse(
+        events(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/api/tools/compress", response_model=None)

@@ -42,6 +42,36 @@ type AnalysisWaitState =
 type DownloadPhase = "preparing" | "ready" | "started";
 type DownloadBody = { url: string; platform: PlatformId; quality?: QualityOption["id"]; audio_bitrate?: Mp3Bitrate; item_indices?: number[]; archive?: boolean };
 type LastDownload = { key: string; body: DownloadBody };
+type DownloadProgress = { stage: string; percent: number | null };
+
+async function readPreparationStream(response: Response, onProgress: (progress: DownloadProgress) => void): Promise<unknown> {
+  if (!response.body) throw new Error("Missing progress stream");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: unknown = null;
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      const dataLine = frame.split("\n").find((line) => line.startsWith("data: "));
+      if (!dataLine) continue;
+      const event = JSON.parse(dataLine.slice(6)) as Record<string, unknown>;
+      if (event.type === "progress" && typeof event.stage === "string") {
+        onProgress({ stage: event.stage, percent: typeof event.percent === "number" ? event.percent : null });
+      } else if (event.type === "ready") {
+        result = { success: true, download_id: event.download_id, filename: event.filename, content_type: event.content_type };
+      } else if (event.type === "error") {
+        result = { success: false, detail: event.detail };
+      }
+    }
+    if (done) break;
+  }
+  if (result === null) throw new Error("Progress stream ended without a result");
+  return result;
+}
 
 function formatDuration(duration: number | null): string | null {
   if (duration === null || !Number.isFinite(duration) || duration < 0) return null;
@@ -59,6 +89,7 @@ function displayPlatform(platform: MediaMetadata["platform"]): string {
     x: "X",
     reddit: "Reddit",
     facebook: "Facebook",
+    youtube: "YouTube",
   };
   return names[platform];
 }
@@ -88,11 +119,11 @@ function publicAnalyzeError(platform: PlatformId, detail?: string): string {
   if (detail === "Invalid URL.") return `Invalid ${name} link.`;
   if (detail?.includes("does not match this downloader")) return detail;
   if (detail?.startsWith("Unsupported URL.")) return `Paste a supported ${name} link.`;
-  if (detail?.includes("individual posts")) return `Paste a link to one public ${name} post, not a profile or feed.`;
+  if (detail?.includes("individual posts")) return platform === "youtube" ? "Paste a link to one public YouTube video or Short." : `Paste a link to one public ${name} post, not a profile or feed.`;
   if (detail?.includes("too many")) return "This post contains too many files.";
-  if (detail?.includes("authentication") || detail?.includes("publicly accessible")) return `This ${name} post isn't publicly accessible.`;
+  if (detail?.includes("authentication") || detail?.includes("publicly accessible")) return `This ${name} ${platform === "youtube" ? "video" : "post"} isn't publicly accessible.`;
   if (detail) return detail;
-  return `This ${name} post could not be accessed. It may be private, removed, or temporarily unavailable.`;
+  return `This ${name} ${platform === "youtube" ? "video" : "post"} could not be accessed. It may be private, removed, or temporarily unavailable.`;
 }
 
 function publicDownloadError(platform: PlatformId, detail?: string): string {
@@ -100,13 +131,13 @@ function publicDownloadError(platform: PlatformId, detail?: string): string {
   if (!detail) return "We couldn't prepare this download. Please try again.";
   if (detail.includes("does not match this downloader")) return detail;
   if (detail.includes("temporarily")) return `${name} temporarily rejected the request. Please try again later.`;
-  if (detail.includes("authentication") || detail.includes("publicly accessible")) return `This ${name} post isn't publicly accessible.`;
+  if (detail.includes("authentication") || detail.includes("publicly accessible")) return `This ${name} ${platform === "youtube" ? "video" : "post"} isn't publicly accessible.`;
   if (detail.includes("selected media")) return "That item is no longer available in this post. Analyze it again.";
-  if (detail.includes("not available")) return "This media is no longer available.";
-  if (detail.includes("format")) return "This format is not available for this video.";
   if (detail.includes("250 MB") || detail.includes("too large")) return "This file is too large for the current Vidorac limits.";
   if (detail.includes("3-hour")) return "This video is longer than Vidorac's 3-hour limit.";
   if (detail.includes("FFmpeg")) return "Vidorac needs FFmpeg to prepare this format.";
+  if (detail.includes("format")) return "This format is not available for this video.";
+  if (detail.includes("not available")) return "This media is no longer available.";
   return "We couldn't prepare this download. Please try again.";
 }
 
@@ -162,6 +193,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
   const [media, setMedia] = useState<MediaMetadata | null>(null);
   const [analyzedUrl, setAnalyzedUrl] = useState<string | null>(null);
   const [downloadPhases, setDownloadPhases] = useState<Record<string, DownloadPhase>>({});
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, DownloadProgress>>({});
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [lastDownload, setLastDownload] = useState<LastDownload | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
@@ -240,6 +272,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
     setSelectedItems(new Set());
     setFailedPreviews(new Set());
     setDownloadPhases({});
+    setDownloadProgress({});
     setSuggestedPlatform(null);
     diagnostics.setStage("request-start");
     diagnostics.beginRequest(diagnosticRequestId, requestHost);
@@ -367,6 +400,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
       setLastDownload(null);
       setSelectedItems(new Set());
       setDownloadPhases({});
+      setDownloadProgress({});
       setRetryUrl(null);
       return;
     }
@@ -383,32 +417,40 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
     if (downloadPhases[key] === "preparing") return;
     const downloadKind = body.quality === "mp3" ? "mp3" : body.quality ? "video" : body.item_indices ? "gallery-selection" : "gallery";
     updatePhase(key, "preparing");
+    if (body.platform === "youtube") setDownloadProgress((current) => ({ ...current, [key]: { stage: "starting", percent: null } }));
     setDownloadError(null);
     setTechnicalError(null);
     setCopiedError(false);
     diagnostics.setDownloadStage(`${downloadKind}-prepare-start`);
     try {
       diagnostics.setDownloadStage(`${downloadKind}-prepare-waiting`);
-      const response = await fetch(`${API_BASE_URL}/api/download/prepare`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const endpoint = body.platform === "youtube" ? "/api/download/prepare-stream" : "/api/download/prepare";
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       diagnostics.setResponseStatus(response.status);
       let rawData: unknown;
       try {
-        const responseText = await response.text();
-        if (!responseText.trim()) throw new SyntaxError("Empty response body");
-        rawData = JSON.parse(responseText) as unknown;
+        if (response.ok && response.headers.get("content-type")?.includes("text/event-stream")) {
+          rawData = await readPreparationStream(response, (progress) => setDownloadProgress((current) => ({ ...current, [key]: progress })));
+        } else {
+          const responseText = await response.text();
+          if (!responseText.trim()) throw new SyntaxError("Empty response body");
+          rawData = JSON.parse(responseText) as unknown;
+        }
       } catch (parseError) {
+        setDownloadProgress((current) => { const next = { ...current }; delete next[key]; return next; });
         setDownloadError("Vidorac received an invalid response from the service.");
-        setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, "Invalid JSON response"));
+        setTechnicalError(technicalMessage(`POST ${endpoint}`, response.status, "Invalid preparation response"));
         diagnostics.captureError(parseError, "download-response-parsing");
         diagnostics.setDownloadStage(`${downloadKind}-prepare-error`);
         updatePhase(key, null);
         return;
       }
       const data = normalizePreparePayload(rawData);
+      setDownloadProgress((current) => { const next = { ...current }; delete next[key]; return next; });
       if (!response.ok || data.kind === "error") {
         const detail = data.kind === "error" ? data.detail : undefined;
         setDownloadError(downloadPreparationError(body, detail));
-        setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, detail));
+        setTechnicalError(technicalMessage(`POST ${endpoint}`, response.status, detail));
         diagnostics.captureError(new Error(detail ?? `HTTP ${response.status}`), "download-api-response");
         diagnostics.setDownloadStage(`${downloadKind}-prepare-error`);
         updatePhase(key, null);
@@ -416,7 +458,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
       }
       if (data.kind !== "success") {
         setDownloadError("Vidorac received an invalid response from the service.");
-        setTechnicalError(technicalMessage("POST /api/download/prepare", response.status, "Unexpected response schema"));
+        setTechnicalError(technicalMessage(`POST ${endpoint}`, response.status, "Unexpected response schema"));
         diagnostics.captureError(new TypeError("Unexpected download response schema"), "download-schema-validation");
         diagnostics.setDownloadStage(`${downloadKind}-prepare-error`);
         updatePhase(key, null);
@@ -441,6 +483,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
         }, 2400));
       }, 350));
     } catch (requestError) {
+      setDownloadProgress((current) => { const next = { ...current }; delete next[key]; return next; });
       setDownloadError("We couldn't reach Vidorac's local service. Please try again.");
       setTechnicalError(technicalMessage("POST /api/download/prepare", "NETWORK"));
       diagnostics.captureError(requestError, "download-fetch");
@@ -499,6 +542,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
     setTechnicalError(null);
     setDownloadError(null);
     setDownloadPhases({});
+    setDownloadProgress({});
     setLastDownload(null);
     setSelectedItems(new Set());
     setFailedPreviews(new Set());
@@ -513,7 +557,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
     analysisRequestId.current += 1;
     analysisController.current?.abort();
     analysisController.current = null;
-    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setSuggestedPlatform(null); setIsAnalyzing(false);
+    setUrl(""); setMedia(null); setAnalyzedUrl(null); setError(null); setTechnicalError(null); setDownloadError(null); setDownloadPhases({}); setDownloadProgress({}); setLastDownload(null); setSelectedItems(new Set()); setFailedPreviews(new Set()); setAnalysisWaitState("idle"); setRetryUrl(null); setSuggestedPlatform(null); setIsAnalyzing(false);
     const focusInput = () => inputRef.current?.focus();
     if (typeof window === "undefined") focusInput();
     else window.requestAnimationFrame(focusInput);
@@ -580,6 +624,17 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
         </div>
 
         <div className="mt-4 border-t border-white/[0.07] px-1 pb-1 pt-4">
+          {expectedPlatform === "youtube" && Object.entries(downloadProgress).map(([key, progress]) => {
+            const format = key.includes("mp3") ? "MP3" : "MP4";
+            const label = progress.stage === "converting" ? "Converting audio to MP3…"
+              : progress.stage === "processing" ? `Merging and preparing ${format}…`
+              : progress.stage === "downloading" ? `Downloading ${format} stream${progress.percent !== null ? `: ${progress.percent}%` : "…"}`
+              : `Preparing ${format}…`;
+            return <div key={key} role="status" aria-live="polite" className="mb-4 rounded-xl border border-[#2389ff]/25 bg-[#1682ff]/[0.07] px-4 py-3 text-sm text-[#9bdcff]">
+              <p>{label}</p>
+              {progress.percent !== null && progress.stage === "downloading" && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#34a5ff] transition-[width]" style={{ width: `${progress.percent}%` }} /></div>}
+            </div>;
+          })}
           {isVideo ? <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(15rem,1fr)]"><section aria-labelledby="video-downloads-title" className="rounded-xl border border-white/[0.07] bg-white/[0.018] p-3 sm:p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="section-label !text-[0.66rem]">Video</p><h3 id="video-downloads-title" className="mt-1 text-sm font-semibold text-white/85">Download video</h3></div><span className="text-xs text-[#65bfff]/65">Real available qualities</span></div><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">{videoQualities.map((quality, index) => {
             const key = `quality:${quality.id}`;
             const phase = downloadPhases[key];
@@ -602,7 +657,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
               <fieldset className="mt-3" data-testid="mp3-bitrate-selector">
                 <legend className="text-xs font-medium text-white/65">MP3 output bitrate</legend>
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
-                  {MP3_BITRATE_OPTIONS.map((option) => {
+                  {MP3_BITRATE_OPTIONS.filter((option) => expectedPlatform !== "youtube" || option.value !== 256).map((option) => {
                     const key = `quality:mp3:${option.value}`;
                     const phase = downloadPhases[key];
                     const preparing = phase === "preparing";

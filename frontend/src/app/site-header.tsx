@@ -12,6 +12,7 @@ export default function SiteHeader() {
 
         <div className="primary-nav-desktop ml-auto items-center gap-2 text-sm text-[var(--text-muted)]">
           <Link href="/" className="header-link header-home-link">Home</Link>
+          <Link href="/youtube" className="header-link">YouTube</Link>
           <Link href="/contact" className="header-link header-contact-link">Contact</Link>
           <SupportButton variant="header" />
         </div>
@@ -24,6 +25,7 @@ export default function SiteHeader() {
           </summary>
           <div className="mobile-nav-panel">
             <Link href="/" className="header-link">Home</Link>
+            <Link href="/youtube" className="header-link">YouTube</Link>
             <Link href="/contact" className="header-link">Contact</Link>
             <SupportButton variant="header" />
           </div>

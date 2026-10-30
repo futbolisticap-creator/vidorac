@@ -10,6 +10,7 @@ const ctaNames: Record<PlatformId, string> = {
   facebook: "Facebook",
   reddit: "Reddit",
   x: "X",
+  youtube: "YouTube",
 };
 
 export default function OtherDownloaders({ currentPlatform }: { currentPlatform: PlatformId }) {

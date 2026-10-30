@@ -113,6 +113,25 @@ export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
       { question: "Will an X link work on another Vidorac page?", answer: "No. Each downloader is isolated to its own platform; use this page for X and Twitter links." },
     ],
   },
+  youtube: {
+    id: "youtube", path: "/youtube", name: "YouTube", title: "YouTube Video Downloader",
+    heroTitle: "Download YouTube videos", heroAccent: "and available MP3 audio",
+    description: "Analyze compatible public YouTube videos and Shorts, then download real MP4 qualities or convert available audio to MP3 with Vidorac.",
+    placeholder: "Paste a YouTube video or Shorts link...", cardDescription: "Download public videos, Shorts and MP3 audio.",
+    supported: "Public youtube.com videos, Shorts and youtu.be links",
+    overview: "Vidorac checks one public YouTube video at a time and shows only the formats the source and current processing tools can prepare.",
+    capabilities: [
+      { title: "Real MP4 qualities", text: "Choose from available video resolutions; separate video and audio streams are merged into one MP4 file." },
+      { title: "YouTube Shorts", text: "Direct public Shorts links work through the same video downloader." },
+      { title: "MP3 audio", text: "Convert available audio to MP3 at 128, 192 or 320 kbps with FFmpeg." },
+    ],
+    limitations: ["Private, login-only, age-restricted and DRM-protected videos are not supported.", "Playlists, channels and live streams are not supported.", "Availability and quality depend on anonymous access to the source video."],
+    faqs: [
+      { question: "Which YouTube links work?", answer: "Use a direct public youtube.com/watch, youtube.com/shorts or youtu.be video link." },
+      { question: "Does the MP4 include sound?", answer: "Yes, when public video and audio streams are available. Vidorac merges separate streams with FFmpeg." },
+      { question: "Does Vidorac use my YouTube account?", answer: "No. Vidorac does not request credentials, personal cookies or access to restricted videos." },
+    ],
+  },
 };
 
-export const platformOrder: PlatformId[] = ["tiktok", "instagram", "facebook", "reddit", "x"];
+export const platformOrder: PlatformId[] = ["tiktok", "instagram", "facebook", "reddit", "x", "youtube"];

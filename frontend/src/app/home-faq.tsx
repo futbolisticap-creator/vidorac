@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const questions = [
   ["What is Vidorac?", "Vidorac is a browser-based hub for downloading compatible media from supported public posts."],
-  ["Which platforms does Vidorac support?", "Vidorac currently provides focused downloaders for TikTok, Instagram, Facebook, Reddit and X / Twitter."],
+  ["Which platforms does Vidorac support?", "Vidorac currently provides focused downloaders for TikTok, Instagram, Facebook, Reddit, X / Twitter and YouTube."],
   ["Do I need to install anything?", "No. Choose a platform and use its downloader directly in your browser."],
   ["Why are different qualities available for some videos?", "Every source exposes different formats. Vidorac shows the options it can verify for that specific public post."],
   ["Can I download audio?", "Audio-only options are shown when a compatible public source provides usable audio."],
