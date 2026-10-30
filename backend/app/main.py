@@ -399,21 +399,24 @@ async def analyze(request: AnalyzeRequest) -> dict[str, object] | JSONResponse:
         detail = (
             "TikTok temporarily blocked access from this network. Please try again later."
             if error.platform == "tiktok"
-            else "YouTube is temporarily limiting requests from our server. Please try again later."
+            else "YouTube rejected our server request with HTTP 429 (rate limit)."
             if error.platform == "youtube"
             else "The source temporarily rejected the request. Please try again later."
         )
         return JSONResponse(status_code=429, content=analysis_error_content(detail, error))
     except AnalysisTemporaryError as error:
-        detail = (
-            "TikTok is temporarily unavailable due to changes on the platform. Please try again later."
-            if error.platform == "tiktok"
-            else "YouTube currently requires additional verification for this media. Please try again later."
-            if error.platform == "youtube" and error.error_category == "youtube_verification_required"
-            else "YouTube is temporarily unable to process this request from our server. Please try again later."
-            if error.platform == "youtube"
-            else "The source is temporarily unavailable. Please try again later."
-        )
+        if error.platform == "youtube":
+            detail = {
+                "youtube_verification_required": "YouTube requires a PO Token to access this media from our server.",
+                "youtube_bot_challenge": "YouTube asked our server to sign in to confirm it is not a bot.",
+                "youtube_forbidden": "YouTube rejected our server request with HTTP 403 (Forbidden).",
+                "youtube_js_challenge": "yt-dlp could not solve YouTube's JavaScript challenge on our server.",
+                "temporary_platform_challenge": "YouTube challenged this request and our server could not complete it.",
+            }.get(error.error_category, "YouTube could not process this server request.")
+        elif error.platform == "tiktok":
+            detail = "TikTok is temporarily unavailable due to changes on the platform. Please try again later."
+        else:
+            detail = "The source is temporarily unavailable. Please try again later."
         return JSONResponse(status_code=503, content=analysis_error_content(detail, error))
     except AnalysisContentUnavailableError as error:
         return JSONResponse(

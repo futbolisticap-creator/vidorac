@@ -212,14 +212,30 @@ def _youtube_technical_error(message: str) -> tuple[str, str]:
                 "sign in to confirm you’re not a bot",
                 "not a bot",
                 "anti-bot",
+            ),
+            "youtube_bot_challenge",
+            "YouTube requested bot verification",
+        ),
+        (
+            (
                 "http error 403",
                 "status code 403",
-                "challenge",
+            ),
+            "youtube_forbidden",
+            "HTTP 403 Forbidden",
+        ),
+        (
+            (
                 "n challenge",
                 "sig challenge",
             ),
+            "youtube_js_challenge",
+            "YouTube JavaScript challenge failed",
+        ),
+        (
+            ("challenge",),
             "temporary_platform_challenge",
-            "Sign in to confirm you're not a bot",
+            "YouTube challenge failed",
         ),
     )
     for terms, category, safe_message in cases:
@@ -890,7 +906,13 @@ def analyze_media(raw_url: str) -> dict[str, Any]:
                     technical_error=technical_error,
                     error_category=category,
                 ) from exc
-            if category in {"temporary_platform_challenge", "youtube_verification_required"}:
+            if category in {
+                "temporary_platform_challenge",
+                "youtube_verification_required",
+                "youtube_bot_challenge",
+                "youtube_forbidden",
+                "youtube_js_challenge",
+            }:
                 raise AnalysisTemporaryError(
                     platform,
                     technical_error=technical_error,
