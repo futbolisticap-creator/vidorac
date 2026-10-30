@@ -201,11 +201,21 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
   const [analysisWaitState, setAnalysisWaitState] = useState<AnalysisWaitState>("idle");
   const [retryUrl, setRetryUrl] = useState<string | null>(null);
   const [suggestedPlatform, setSuggestedPlatform] = useState<PlatformId | null>(null);
+  const [pasteMode, setPasteMode] = useState<"pending" | "button" | "shortcut">("pending");
   const inputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const analysisTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const analysisController = useRef<AbortController | null>(null);
   const analysisRequestId = useRef(0);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(pointer: fine)").matches && !/Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+    const frame = window.requestAnimationFrame(() => {
+      setPasteMode(desktop && /Firefox\/\d+/i.test(navigator.userAgent) ? "shortcut" : "button");
+      if (desktop && document.activeElement === document.body) inputRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     if (media) diagnostics.setStage("result-rendered");
@@ -596,7 +606,7 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
       <form onSubmit={handleSubmit} noValidate className="mx-auto max-w-4xl">
         <div className={`analyzer-form rounded-xl border bg-[var(--surface)] p-2 sm:flex sm:min-h-[4.25rem] sm:items-center sm:gap-2 ${error ? "border-red-400/30" : "border-[var(--border)]"}`}>
           <label htmlFor="media-url" className="sr-only">Public {platformName} URL</label>
-          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => handleUrlChange(event.target.value)} placeholder={placeholder} className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} /><button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label={`Paste ${platformName} URL from clipboard`}>Paste</button></div>
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-white/30 sm:py-0"><LinkIcon /><input ref={inputRef} id="media-url" type="url" value={url} onChange={(event) => handleUrlChange(event.target.value)} onPaste={() => { setError(null); setSuggestedPlatform(null); }} placeholder={placeholder} className="min-w-0 w-full bg-transparent text-base text-white outline-none placeholder:text-white/25 disabled:cursor-not-allowed disabled:opacity-60" autoComplete="url" disabled={isAnalyzing} aria-describedby={error ? "analyze-error" : undefined} aria-invalid={Boolean(error)} />{pasteMode === "shortcut" ? <span className="shrink-0 px-2.5 text-xs text-[#80d4ff]/70">Ctrl + V</span> : pasteMode === "button" ? <button type="button" onClick={handlePaste} disabled={isAnalyzing} className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#80d4ff]/80 transition hover:bg-[#1682ff]/10 hover:text-[#a9e4ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#65c9ff] disabled:opacity-40" aria-label={`Paste ${platformName} URL from clipboard`}>Paste</button> : null}</div>
           <button type="submit" disabled={isAnalyzing} data-analyzing={isAnalyzing} className="analyze-button flex w-full items-center justify-center gap-2 rounded-[10px] bg-[var(--blue)] px-7 py-3.5 text-sm font-semibold text-white transition hover:bg-[var(--blue-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cyan)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 sm:min-h-[3.25rem] sm:w-auto">
             <span className="relative size-[1.1rem] shrink-0" aria-hidden="true" data-testid="analyze-icon-slot">
               <SearchIcon className={`absolute inset-0 transition-opacity ${isAnalyzing ? "invisible opacity-0" : "visible opacity-100"}`} />
