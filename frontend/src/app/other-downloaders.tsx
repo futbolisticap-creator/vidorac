@@ -4,15 +4,6 @@ import PlatformBrandIcon from "./platform-brand-icon";
 import { platformConfigs, platformOrder } from "./platform-config";
 import type { PlatformId } from "./platform-status";
 
-const ctaNames: Record<PlatformId, string> = {
-  tiktok: "TikTok",
-  instagram: "Instagram",
-  facebook: "Facebook",
-  reddit: "Reddit",
-  x: "X",
-  youtube: "YouTube",
-};
-
 export default function OtherDownloaders({ currentPlatform }: { currentPlatform: PlatformId }) {
   const alternatives = platformOrder.filter((platform) => platform !== currentPlatform);
   const headingId = `other-downloaders-${currentPlatform}`;
@@ -30,6 +21,7 @@ export default function OtherDownloaders({ currentPlatform }: { currentPlatform:
       <div className="other-downloaders-grid">
         {alternatives.map((platformId) => {
           const platform = platformConfigs[platformId];
+          const ctaName = platformId === "x" ? "X" : platform.name;
           return (
             <article key={platformId} className={`other-downloader-card other-downloader-${platformId}`}>
               <div className="other-downloader-heading">
@@ -37,8 +29,8 @@ export default function OtherDownloaders({ currentPlatform }: { currentPlatform:
                 <h3>{platform.name}</h3>
               </div>
               <p>{platform.cardDescription}</p>
-              <Link className="secondary-card-cta" href={platform.path} aria-label={`Open ${ctaNames[platformId]} Downloader`}>
-                <span className="serif-action-label">Open {ctaNames[platformId]} Downloader</span>
+              <Link className="secondary-card-cta" href={platform.path} aria-label={`Open ${ctaName} Downloader`}>
+                <span className="serif-action-label">Open {ctaName} Downloader</span>
                 <span className="other-downloader-arrow" aria-hidden="true">→</span>
               </Link>
             </article>

@@ -390,10 +390,12 @@ export default function Analyzer({ expectedPlatform = "tiktok", placeholder = "P
         decision.action === "invalid"
           ? (url.trim() ? `Invalid ${name} link.` : `Paste a ${name} link first.`)
           : decision.action === "wrong_platform"
-            ? `We detected a ${platformNames[decision.platform]} link. Open the ${platformNames[decision.platform]} Downloader instead.`
+            ? decision.platform === "youtube"
+              ? "YouTube Downloader is currently unavailable on Vidorac."
+              : `We detected a ${platformNames[decision.platform]} link. Open the ${platformNames[decision.platform]} Downloader instead.`
             : `This is not a supported ${name} URL.`,
       );
-      setSuggestedPlatform(decision.action === "wrong_platform" ? decision.platform : null);
+      setSuggestedPlatform(decision.action === "wrong_platform" && decision.platform !== "youtube" ? decision.platform : null);
       setTechnicalError(null);
       setAnalyzedUrl(null);
       setDownloadError(null);

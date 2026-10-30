@@ -134,4 +134,4 @@ export const platformConfigs: Record<PlatformId, PlatformPageConfig> = {
   },
 };
 
-export const platformOrder: PlatformId[] = ["tiktok", "instagram", "facebook", "reddit", "x", "youtube"];
+export const platformOrder: PlatformId[] = ["tiktok", "instagram", "facebook", "reddit", "x"];

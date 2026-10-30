@@ -12,7 +12,7 @@ export default function SiteFooter() {
             <div className="footer-brand">
               <Image src="/branding/vidorac-logo.svg" alt="Vidorac" width={124} height={32} className="footer-brand-logo" />
             </div>
-            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Focused public-media downloaders for TikTok, Instagram, Facebook, Reddit, X and YouTube.</p>
+            <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">Focused public-media downloaders for TikTok, Instagram, Facebook, Reddit and X.</p>
           </div>
 
           <nav aria-label="Downloaders" className="footer-link-column">
@@ -43,7 +43,7 @@ export default function SiteFooter() {
         </div>
 
         <div className="footer-lower">
-          <p className="footer-legal">Vidorac is an independent service and is not affiliated with, endorsed by, or sponsored by TikTok, Instagram, Facebook, Reddit, X, or YouTube. Their trademarks belong to their respective owners. Users are responsible for ensuring they have permission to download and use content.</p>
+          <p className="footer-legal">Vidorac is an independent service and is not affiliated with, endorsed by, or sponsored by TikTok, Instagram, Facebook, Reddit or X. Their trademarks belong to their respective owners. Users are responsible for ensuring they have permission to download and use content.</p>
           <div className="footer-bottom">
             <p>© {new Date().getFullYear()} Vidorac</p>
             <p>Only download content you own or have permission to use.</p>

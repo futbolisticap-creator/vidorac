@@ -20,7 +20,7 @@ export default function TermsPage() {
 
       <section>
         <h2>Service</h2>
-        <p>Vidorac is a tool for processing publicly accessible media from supported platforms, including TikTok, Instagram, Facebook, Reddit, X and YouTube.</p>
+        <p>Vidorac is a tool for processing publicly accessible media from supported platforms, including TikTok, Instagram, Facebook, Reddit and X.</p>
       </section>
 
       <section>
@@ -40,7 +40,7 @@ export default function TermsPage() {
 
       <section>
         <h2>Third-party platforms</h2>
-        <p>Vidorac is independent and is not affiliated with or endorsed by TikTok, Instagram, Facebook, Reddit, X, YouTube or their owners. Their trademarks belong to their respective owners, and use of each platform remains subject to its applicable terms.</p>
+        <p>Vidorac is independent and is not affiliated with or endorsed by TikTok, Instagram, Facebook, Reddit, X or their owners. Their trademarks belong to their respective owners, and use of each platform remains subject to its applicable terms.</p>
       </section>
 
       <section>

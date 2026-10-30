@@ -9,11 +9,11 @@ import { OG_IMAGE_ALT, OG_IMAGE_PATH, SITE_URL } from "./seo";
 import { TelegramHomepageCard } from "./telegram-promotion";
 
 export const metadata: Metadata = {
-  title: { absolute: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube" },
+  title: { absolute: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X" },
   description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
   alternates: { canonical: `${SITE_URL}/` },
   openGraph: {
-    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
     description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
     url: `${SITE_URL}/`,
     siteName: "Vidorac",
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
     description: "Choose a supported platform and download compatible public videos, audio and media with Vidorac — directly in your browser.",
     images: [OG_IMAGE_PATH],
   },
@@ -35,22 +35,13 @@ const steps = [
 ];
 
 const features = [
-  ["Multiple platforms", "Choose from six focused platform downloaders."],
+  ["Multiple platforms", "Choose from five focused platform downloaders."],
   ["Quality options", "Select from the formats and qualities genuinely available."],
   ["Mobile friendly", "Use a clear, responsive interface across screen sizes."],
   ["No installation", "Open Vidorac directly in a modern browser."],
   ["Audio options", "Use audio-only choices when the source supports them."],
   ["Platform isolation", "Each downloader accepts links from its matching platform only."],
 ];
-
-const ctaNames = {
-  tiktok: "TikTok",
-  instagram: "Instagram",
-  facebook: "Facebook",
-  reddit: "Reddit",
-  x: "X",
-  youtube: "YouTube",
-} as const;
 
 export default function Home() {
   const description = "Choose a supported platform and download compatible public videos, audio and media with Vidorac.";
@@ -89,6 +80,7 @@ export default function Home() {
             <div className="hub-platform-grid">
               {platformOrder.map((id) => {
                 const platform = platformConfigs[id];
+                const ctaName = id === "x" ? "X" : platform.name;
                 return (
                   <article key={id} className={`hub-platform-card hub-platform-${id}`}>
                     <div className="platform-card-header">
@@ -96,8 +88,8 @@ export default function Home() {
                       <p className="section-label">{platform.name}</p>
                     </div>
                     <div className="platform-card-copy"><h3>{platform.title}</h3><p>{platform.cardDescription}</p></div>
-                    <Link className="platform-card-cta secondary-card-cta" href={platform.path} aria-label={`Open ${ctaNames[id]} Downloader`}>
-                      <span className="serif-action-label">Open {ctaNames[id]} Downloader</span><span className="platform-card-arrow" aria-hidden="true">→</span>
+                    <Link className="platform-card-cta secondary-card-cta" href={platform.path} aria-label={`Open ${ctaName} Downloader`}>
+                      <span className="serif-action-label">Open {ctaName} Downloader</span><span className="platform-card-arrow" aria-hidden="true">→</span>
                     </Link>
                   </article>
                 );

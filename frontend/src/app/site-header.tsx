@@ -7,7 +7,7 @@ import PlatformBrandIcon from "./platform-brand-icon";
 import { platformNames, platformPaths, type PlatformId } from "./platform-status";
 import SupportButton from "./support-button";
 
-const menuPlatforms: PlatformId[] = ["youtube", "tiktok", "instagram", "facebook", "reddit", "x"];
+const menuPlatforms: PlatformId[] = ["tiktok", "instagram", "facebook", "reddit", "x"];
 
 export default function SiteHeader() {
   const [openMenu, setOpenMenu] = useState<"desktop" | "mobile" | null>(null);

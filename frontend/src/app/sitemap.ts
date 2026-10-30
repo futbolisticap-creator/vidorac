@@ -11,7 +11,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/facebook`, changeFrequency: "monthly", priority: 0.9 },
     { url: `${SITE_URL}/reddit`, changeFrequency: "monthly", priority: 0.9 },
     { url: `${SITE_URL}/x`, changeFrequency: "monthly", priority: 0.9 },
-    { url: `${SITE_URL}/youtube`, changeFrequency: "monthly", priority: 0.9 },
     { url: `${SITE_URL}/contact`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.4 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.4 },

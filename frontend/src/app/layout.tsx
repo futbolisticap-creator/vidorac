@@ -28,10 +28,10 @@ const homeSerif = Instrument_Serif({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
+    default: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
     template: "%s — Vidorac",
   },
-  description: "Download videos and media from TikTok, Instagram, Facebook, Reddit, X and YouTube with Vidorac.",
+  description: "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.",
   applicationName: "Vidorac",
   alternates: { canonical: "/" },
   verification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim()
@@ -45,8 +45,8 @@ export const metadata: Metadata = {
     shortcut: "/branding/vidorac-icon.svg",
   },
   openGraph: {
-    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
-    description: "Download videos and media from TikTok, Instagram, Facebook, Reddit, X and YouTube with Vidorac.",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
+    description: "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.",
     url: "/",
     siteName: "Vidorac",
     type: "website",
@@ -54,8 +54,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit, X & YouTube",
-    description: "Download videos and media from TikTok, Instagram, Facebook, Reddit, X and YouTube with Vidorac.",
+    title: "Vidorac — Video Downloader for TikTok, Instagram, Facebook, Reddit & X",
+    description: "Download videos and media from TikTok, Instagram, Facebook, Reddit and X with Vidorac.",
     images: [OG_IMAGE_PATH],
   },
 };
