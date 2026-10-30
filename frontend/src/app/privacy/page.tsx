@@ -14,6 +14,7 @@ export default function PrivacyPage() {
       eyebrow="Legal"
       title="Privacy Policy"
       intro="This policy explains how Vidorac currently handles information when you use the service."
+      showRelatedLinks={false}
     >
       <p className="information-updated">Last updated: September 2026</p>
 

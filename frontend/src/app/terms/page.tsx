@@ -14,6 +14,7 @@ export default function TermsPage() {
       eyebrow="Legal"
       title="Terms of Use"
       intro="These terms describe the responsible use of Vidorac."
+      showRelatedLinks={false}
     >
       <p className="information-updated">Last updated: September 2026</p>
 
