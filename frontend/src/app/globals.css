@@ -451,13 +451,13 @@ button { -webkit-tap-highlight-color: transparent; }
 
 .hub-platform-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 1rem;
 }
 
 .hub-platform-card {
   position: relative;
-  grid-column: span 2;
   display: flex;
   min-width: 0;
   overflow: hidden;
@@ -472,7 +472,6 @@ button { -webkit-tap-highlight-color: transparent; }
   transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
 
-.hub-platform-card:nth-last-child(-n + 2) { grid-column: span 3; }
 .hub-platform-card:hover { transform: translateY(-2px); border-color: rgba(104, 211, 255, 0.34); }
 
 .hub-platform-card::after {
@@ -1671,9 +1670,7 @@ button { -webkit-tap-highlight-color: transparent; }
   .seo-section { padding-block: 3.5rem; }
   .seo-donate-section { align-items: flex-start; flex-direction: column; }
   .information-shell { padding-top: 7.5rem; }
-  .hub-platform-grid { grid-template-columns: 1fr; }
-  .hub-platform-card,
-  .hub-platform-card:nth-last-child(-n + 2) { grid-column: auto; }
+  .hub-platform-grid { grid-template-columns: minmax(0, 1fr); }
   .hub-hero { padding-top: 7.75rem; padding-bottom: 3.25rem; }
   .hub-platform-section { padding-bottom: 2.75rem; }
   .compact-content-section { padding-block: 2.75rem; }
@@ -2068,9 +2065,6 @@ button { -webkit-tap-highlight-color: transparent; }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .home-page .hub-platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-page .hub-platform-card,
-  .home-page .hub-platform-card:nth-last-child(-n + 2) { grid-column: auto; }
-  .home-page .hub-platform-card:last-child { grid-column: 1 / -1; width: calc(50% - 0.525rem); justify-self: center; }
   .home-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home-feature-grid article,
   .home-feature-grid article:nth-child(3n),
